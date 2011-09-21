@@ -1,10 +1,14 @@
 package Net::SSH::Mechanize;
 use AnyEvent;
 #use AnyEvent::Log;
-use Coro;
-use Net::SSH::Mechanize::Subprocess;
+#use Coro;
 use Moose;
-use Scalar::Util qw(refaddr);
+use Net::SSH::Mechanize::ConnectParams;
+use Net::SSH::Mechanize::Session;
+use Net::SSH::Mechanize::Util;
+use AnyEvent::Subprocess;
+#use Scalar::Util qw(refaddr);
+use Carp qw(croak);
 
 #$AnyEvent::Log::FILTER->level("fatal");
 
@@ -25,108 +29,91 @@ $logger->add(Log::Dispatch::Screen->new(
 
 =cut
 
+my @connection_params = qw(host user port);
 
 
-######################################################################
-# attributes
-
-# FIXME need to think about how to allow switching a pty subprocess for another.
-# pty set_raw is currently hardwired in the factory class.
-
-has 'ssh_process_factory' => (
-    isa => 'Net::SSH::Mechanize::Subprocess',
+has 'connection_params' => (
+    isa => 'Net::SSH::Mechanize::ConnectParams',
     is => 'ro',
-    lazy => 1,
+    handles => \@connection_params,
+);
+
+
+has '_subprocess_prototype' => (
+    isa => 'AnyEvent::Subprocess',
+    is => 'ro',
     default => sub {
-        return Net::SSH::Mechanize::Subprocess->default;
+        return AnyEvent::Subprocess->new(
+            delegates => [
+                'Pty', 
+                'CompletionCondvar',
+                'PrintError',
+                [Handle => {
+                    name      => 'stderr',
+                    direction => 'r',
+                replace   => \*STDERR,
+                }],
+            ],
+            code  => sub { 
+                my $args = shift;
+                my $cp = $args->{params};
+                exec $cp->ssh_cmd;
+            },
+        );
     },
 );
 
+around 'BUILDARGS' => sub {
+    my $orig = shift;
+    my $self = shift;
 
-has '_running_list' => (
-    isa => 'HashRef',
-    is => 'ro',
-    default => sub { +{} },
-);
+    my $params = $self->$orig(@_);
 
-    
+    # check for connection_params paramter
+    if (exists $params->{connection_params}) {
+
+        foreach my $param (@connection_params) {
+            croak "Cannot specify both $param and connection_params parameters"
+                if exists $params->{$param};
+        }
+
+        return $params; # as is
+    }
+
+    # Splice @connection_params out of %$params and into %cp_params
+    my %cp_params;
+    foreach my $param (@connection_params) {
+        next unless exists $params->{$param};
+        $cp_params{$param} = $params->{$param};
+    }
+
+    # Try and construct a ConnectParams instance
+    my $cp = Net::SSH::Mechanize::ConnectParams->new(%cp_params);
+    return {%$params, connection_params => $cp};
+};
+
+
 ######################################################################
 # public methods
 
-sub spawn {
+sub login_async {
     my $self = shift;
-    my $session_params = shift;
-    # FIXME validate args
 
-    my $subprocess = $self->ssh_process_factory->run($session_params);
-    
-    return $subprocess;
+    my $session = $self->_subprocess_prototype->run({params => $self->connection_params});
+
+    # turn off terminal echo
+    $session->delegate('pty')->handle->fh->set_raw;
+
+    # Rebless $session into a subclass of AnyEvent::Subprocess::Running
+    # which just supplies extra methods we need.
+    bless $session, 'Net::SSH::Mechanize::Session';
+
+
+    return $session->login_async(@_);
 }
-
-
-
-sub add_session {
-    my $self = shift;
-    my %args = @_;
-
-    # FIXME validate args here
-
-    my $sessions = $self->sessions;
-
-    push @$sessions, \%args;
-
-    return $self;
-}
-
-
-
 
 sub login {
-    my $self = shift;
-
-    my $sessions = $self->sessions;
-    my $running = $self->_running_list;
-    my $count = 0;
-    foreach my $session (@$sessions) {
-        my $id = refaddr $session->{_pid};
-        
-        my $subprocess = $running->{$id};
-        if ($subprocess) {
-            my $pid = $subprocess->child_pid;
-            warn "Session $id is already running with PID $pid, skipping it\n";
-            next;
-        }
-        
-        $running->{$id} = $self->spawn($session);
-        $count++;
-    }
-
-    return $count;
-}
-
-
-
-sub capture {
-    my $self = shift;
-    my $cmd = shift;
-    my $result_cb = shift;
-
-    my $running = $self->_running_list;    
-    my %results;
-    foreach my $id (keys %$running) {
-
-        my $coro = async {
-            my $subprocess = $running->{$id};
-            # FIXME check this gets a usable result
-
-            my $pty = $subprocess->delegate('pty')->handle;
-            
-            sub logout {
-                push_write "exit\n";
-            }
-        };
-    }
-    
+    return Net::SSH::Mechanize::Util->synchronize(shift, login_async => @_);
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -1,5 +1,6 @@
-package Net::SSH::Mechanize::Subprocess::Running;
+package Net::SSH::Mechanize::Session;
 use Moose;
+use MooseX::Params::Validate;
 use AnyEvent;
 use Coro;
 use Carp qw(croak);
@@ -18,11 +19,11 @@ my $prompt_re = qr/$delim\Q$ \E$/m;
 
 sub expect_async {
     my $self = shift;
-    my $ready_cb = pop
-        or croak "you must supplu a callback as the last argument";
-    ref $ready_cb eq 'CODE'
-        or croak "last argument is not a callback ($ready_cb)";
-    
+    my ($ready_cb) = pos_validated_list(
+        [pop @_],
+        { isa => 'CodeRef' },
+    );
+
     $self->delegate('pty')->handle->push_read(@_, $ready_cb);    
 
 #    print "expecting @_\n"; # DB
@@ -32,10 +33,7 @@ sub expect_async {
 
 
 sub expect {
-    my $self = shift;
-    return $self->expect_async(@_, Coro::rouse_cb);
-    my ($handle, $data) = Coro::rouse_wait;
-    return $data;
+    return Net::SSH::Mechanize::Util->synchronize(shift, expect_async => @_);
 }
 
 sub push_write {
@@ -47,13 +45,11 @@ sub push_write {
 
 sub login_async {
     my $self = shift;
-    my $ready_cb = pop
-        or croak "you must supplu a callback as the last argument";
-    ref $ready_cb eq 'CODE'
-        or croak "last argument is not a callback ($ready_cb)";
-
-    my $passwd = shift
-        or croak "first argument must be a password.";
+    my ($passwd, $ready_cb) = pos_validated_list(
+        \@_,
+        { isa => 'Str' },
+        { isa => 'CodeRef' },
+    );
 
     $self->expect_async(regex => qr/$passwd_prompt_re|$initial_prompt_re/, sub {
         if ($_[1] =~ /$passwd_prompt_re/) { # we need to give the password
@@ -62,7 +58,7 @@ sub login_async {
                 $self->push_write(qq(PS1="$delim\$ "; export PS1\n));
 
                 $self->expect_async(regex => $prompt_re, sub {
-                    $ready_cb->($_[0]);
+                    $ready_cb->($_[0], $self);
                 });
             });
         }
@@ -70,7 +66,7 @@ sub login_async {
             $self->push_write(qq(PS1="$delim\$ "; export PS1\n));
 
             $self->expect_async(regex => $prompt_re, sub {
-                $ready_cb->($_[0]);
+                $ready_cb->($_[0], $self);
             });
         }
     });
@@ -79,11 +75,9 @@ sub login_async {
 }
 
 sub login {
-    my $self = shift;
-    $self->login_async(@_, Coro::rouse_cb);
-    Coro::rouse_wait;
-    return $self;
+    return Net::SSH::Mechanize::Util->synchronize(shift, login_async => @_);
 }
+
 
 sub logout {
     my $self = shift;
@@ -95,11 +89,11 @@ sub logout {
 
 sub capture_async {
     my $self = shift;
-    my $cmd = shift;
-    my $ready_cb = pop
-        or croak "you must supplu a callback as the last argument";
-    ref $ready_cb eq 'CODE'
-        or croak "last argument is not a callback ($ready_cb)";
+    my ($cmd, $ready_cb) = pos_validated_list(
+        \@_,
+        { isa => 'Str' },
+        { isa => 'CodeRef' },
+    );
 
     $cmd =~ s/\s*\Z/\n/ms;
 
@@ -132,22 +126,18 @@ sub capture_async {
 
 
 sub capture {
-    my $self = shift;
-    $self->capture_async(@_, Coro::rouse_cb);
-    my ($handle, $data) = Coro::rouse_wait;
-    return $data;
+    return Net::SSH::Mechanize::Util->synchronize(shift, capture_async => @_);
 }
-
 
 
 sub sudo_capture_async {
     my $self = shift;
-    my $cmd = shift;
-    my $passwd = shift;
-    my $ready_cb = pop
-        or croak "you must supplu a callback as the last argument";
-    ref $ready_cb eq 'CODE'
-        or croak "last argument is not a callback ($ready_cb)";
+    my ($cmd, $passwd, $ready_cb) = pos_validated_list(
+        \@_,
+        { isa => 'Str' },
+        { isa => 'Str' },
+        { isa => 'CodeRef' },
+    );
 
     # Erase any cached sudo authentication - we want to guarantee that
     # expect will negotiate a password prompt.
@@ -177,10 +167,7 @@ sub sudo_capture_async {
 }
 
 sub sudo_capture {
-    my $self = shift;
-    $self->sudo_capture_async(@_, Coro::rouse_cb);
-    my ($handle, $data) = Coro::rouse_wait;
-    return $data;
+    return Net::SSH::Mechanize::Util->synchronize(shift, sudo_capture_async => @_);
 }
 
 

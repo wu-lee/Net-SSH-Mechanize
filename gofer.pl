@@ -7,17 +7,15 @@ use lib "$Bin/local-lib/lib/perl5", "$Bin/lib";
 use File::Slurp qw(slurp);
 
 
-use Net::SSH::Mechanize::Subprocess;
+use Net::SSH::Mechanize;
 
-my $ssh = Net::SSH::Mechanize::Subprocess->default;
-
-my $session = $ssh->run({
+my $ssh = Net::SSH::Mechanize->new(
     host => 'aruna.interactive.co.uk',
-});
+);
 
 my $passwd = slurp '.passwd';
 chomp $passwd;
-$session->login($passwd);
+my $session = $ssh->login($passwd);
 
 my @exchanges = (
     [q(id)],
