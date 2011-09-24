@@ -11,6 +11,7 @@ use Net::SSH::Mechanize;
 
 my $ssh = Net::SSH::Mechanize->new(
     host => 'localhost',
+#    host => 'aruna.interactive.co.uk',
 );
 
 my $passwd = slurp '../.passwd';

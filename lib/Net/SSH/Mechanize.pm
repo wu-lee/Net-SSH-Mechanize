@@ -9,6 +9,8 @@ use Net::SSH::Mechanize::Util;
 use AnyEvent::Subprocess;
 #use Scalar::Util qw(refaddr);
 use Carp qw(croak);
+our @CARP_NOT = qw(AnyEvent AnyEvent::Subprocess Coro::AnyEvent);
+{ package Coro::AnyEvent; our @CARP_NOT = qw(AnyEvent::CondVar) }
 
 #$AnyEvent::Log::FILTER->level("fatal");
 
@@ -44,16 +46,18 @@ has '_subprocess_prototype' => (
     is => 'ro',
     default => sub {
         return AnyEvent::Subprocess->new(
+            run_class => 'Net::SSH::Mechanize::Session',
             delegates => [
                 'Pty', 
                 'CompletionCondvar',
-                'PrintError',
                 [Handle => {
                     name      => 'stderr',
                     direction => 'r',
                 replace   => \*STDERR,
                 }],
             ],
+#            on_error => sub { print "error! @_\n" },
+            on_completion => sub { print "$Coro::current complete! @_\n" },
             code  => sub { 
                 my $args = shift;
                 my $cp = $args->{params};
@@ -106,14 +110,21 @@ sub login_async {
 
     # Rebless $session into a subclass of AnyEvent::Subprocess::Running
     # which just supplies extra methods we need.
-    bless $session, 'Net::SSH::Mechanize::Session';
+#    bless $session, 'Net::SSH::Mechanize::Session';
 
-
-    return $session->login_async(@_);
+        printf "$Coro::current about to call login_async\n";
+    my @arg = $session->login_async(@_);
+    printf "$Coro::current exited login_async @arg\n";
+    return @arg;
 }
 
 sub login {
-    return Net::SSH::Mechanize::Util->synchronize(shift, login_async => @_);
+#    return (shift->login_async(@_)->recv)[1];
+    my ($cv) = shift->login_async(@_);
+        printf "$Coro::current about to call recv\n";
+    my $v = ($cv->recv)[1];
+        printf "$Coro::current about to called recv\n";
+    return $v;
 }
 
 __PACKAGE__->meta->make_immutable;
