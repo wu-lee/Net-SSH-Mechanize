@@ -57,7 +57,7 @@ has '_subprocess_prototype' => (
                 }],
             ],
 #            on_error => sub { print "error! @_\n" },
-            on_completion => sub { print "$Coro::current complete! @_\n" },
+#            on_completion => sub { printf "$Coro::current child complete!\n" },
             code  => sub { 
                 my $args = shift;
                 my $cp = $args->{params};
@@ -103,7 +103,43 @@ around 'BUILDARGS' => sub {
 sub login_async {
     my $self = shift;
 
-    my $session = $self->_subprocess_prototype->run({params => $self->connection_params});
+    my $session;
+#    $session = $self->_subprocess_prototype->run({
+#        params => $self->connection_params,
+#        on_completion => sub {
+#            print "completing child PID ". $session->child_pid ."\n";
+#            $session->_error_event->send("child PID ".$session->child_pid ." completed");
+#            undefine $session;
+#        },
+#    });
+
+    # We do this funny stuff with $session and $job so that the on_completion
+    # callback can tell the session it should clean up
+    my $job = AnyEvent::Subprocess->new(
+        run_class => 'Net::SSH::Mechanize::Session',
+            delegates => [
+                'Pty', 
+                'CompletionCondvar',
+                [Handle => {
+                    name      => 'stderr',
+                    direction => 'r',
+                replace   => \*STDERR,
+                }],
+            ],
+#            on_error => sub { print "error! @_\n" },
+        on_completion => sub {
+            printf "xx completing child PID %d _error_event %s is %s \n",
+                $session->child_pid, $session->_error_event, $session->_error_event->ready? "ready":"unready";
+            $session->_error_event->send("child PID ".$session->child_pid ." completed");
+            undef $session;
+        },
+        code  => sub { 
+            my $args = shift;
+            my $cp = $args->{params};
+            exec $cp->ssh_cmd;
+        },
+    );
+    $session = $job->run({params => $self->connection_params});
 
     # turn off terminal echo
     $session->delegate('pty')->handle->fh->set_raw;
@@ -112,7 +148,7 @@ sub login_async {
     # which just supplies extra methods we need.
 #    bless $session, 'Net::SSH::Mechanize::Session';
 
-        printf "$Coro::current about to call login_async\n";
+printf "$Coro::current about to call login_async\n";
     my @arg = $session->login_async(@_);
     printf "$Coro::current exited login_async @arg\n";
     return @arg;

@@ -32,7 +32,7 @@ sub expect_async {
 
     # we want the _error_event condvar to trigger a croak sent to $done.
     # FIXME check _error_event for expiry?
-    $self->_error_event->cb(sub { $done->croak(@_) });
+    $self->_error_event->cb(sub { print "_error_event sent\n"; $done->croak(@_) });
     $self->delegate('completion_condvar')->condvar->cb(sub { $done->croak(@_) });
 
     $self->delegate('pty')->handle->push_read(@_, sub { 
@@ -159,6 +159,8 @@ sub login_async {
 
     my $stdin = $self->delegate('pty')->handle;
     my $stderr = $self->delegate('stderr')->handle;
+
+    $self->_error_event->cb(sub { print "_error_event sent\n"; $done->croak(@_) });
 
     my $timeout;
     $timeout = AnyEvent->timer(
@@ -529,7 +531,7 @@ sub capture_async {
     # we want the _error_event condvar to trigger a croak sent to $done.
     my $done = AnyEvent->condvar;
     # FIXME check _error_event for expiry?
-    $self->_error_event->cb(sub { $done->croak(@_) });
+    $self->_error_event->cb(sub { print "xxxx _error_event\n"; $done->croak(@_) });
 
     my $read_output_cb = sub {
         my ($handle) = @_;
