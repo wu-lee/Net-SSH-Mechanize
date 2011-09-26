@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 use strict;
 use warnings;
-use Test::More tests => 1;
+use Test::More;
 use FindBin qw($Bin);
 use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib";
 use File::Slurp qw(slurp);
@@ -10,35 +10,33 @@ use Coro;
 use Net::SSH::Mechanize;
 use Coro::Debug;
 
- our $server = new_unix_server Coro::Debug "/tmp/socketpath";
+
+my $passwd = $ENV{PASSWD}
+    or die "you must define the PASSWD environment variable";
 
 
-my $passwd = slurp '../.passwd';
-chomp $passwd;
-
-
-my $max = 11;
+my $threads = 10;
 
 my @exchanges = (
     [q(id),
      qr/uid=\d+\(\S+\) gid=\d+\(\S+\)/],
     [qq(ls $Bin/data/01.single-capture.t),
-     qr/\Aa\s+b\s+c\s*\Z/sm],
-    [q(perl -e 'print "eoled\nnot eoled"'),
-     qr/\Aeoled\nnot eoled\Z/sm],
+     qr/\Aa\s+b\s+c\s*\z/sm],
+    [q(printf "eoled\nnot eoled"),
+     qr/\Aeoled\nnot eoled\z/sm],
     [q(cat /etc/shadow | grep root),
      qr{cat: /etc/shadow: Permission denied}],
 );
 
-use Coro::Debug;
+plan tests => @exchanges * $threads + 2;
 
 my %connection = (
     host => 'localhost',
 #    host => 'aruna.interactive.co.uk',
 #    host => 'auriga',
 );
-my (@ssh) = map { Net::SSH::Mechanize->new(%connection) } 1..$max;
-is @ssh, $max, "number of subprocesses is $max";
+my (@ssh) = map { Net::SSH::Mechanize->new(%connection) } 1..$threads;
+is @ssh, $threads, "number of subprocesses is $threads";
 
 my @threads;
 my $ix = 0;
@@ -46,7 +44,7 @@ foreach my $ix (1..@ssh) {
     push @threads, async {
         my $id = $ix;
         my $ssh = $ssh[$id-1];
-        note "(thread=$ix $Coro::current) starting";
+        note "(thread=$ix) starting";
             $id == 11 and Coro::Debug::trace;
         eval {
             my $session = $ssh->login($passwd);
@@ -54,7 +52,6 @@ foreach my $ix (1..@ssh) {
             foreach my $exchange (@exchanges) {
                 my ($cmd, $expect) = @$exchange;
                 
-                next;
                 my $data = $session->capture($cmd);
                 
                 like $data, $expect, "(thread=$ix) $cmd: got expected data";
@@ -70,7 +67,7 @@ foreach my $ix (1..@ssh) {
      };
 }
 
-is @threads, $max, "number of threads is $max";
+is @threads, $threads, "number of threads is $threads";
 my $id = 0;
 foreach my $thread (@threads) {
     note "joining thread ",++$id;
