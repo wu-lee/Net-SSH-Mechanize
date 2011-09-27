@@ -101,7 +101,7 @@ sub _define_automation {
 #        printf "before: state is %s %s\n", $function, $state; # DB 
         $state = $states->{$state}->(@_);
         exists $states->{$state}
-            or die "something is wrong, next state returned is undefined ($state)";
+            or die "something is wrong, next state returned is an unknown name: '$state'";
 
 #        printf "after: state is %s %s\n", $function, $state; # DB 
         if (!$states->{$state}) { # terminal state, stop reading
@@ -366,7 +366,7 @@ sub sudo_capture_async {
             
             $cumdata .= $stdin->{rbuf};
             $stdin->{rbuf} = '';
-            return 'send_cmd';
+            return 'sent_cmd';
         },
 
         exited_shell => sub {
