@@ -1,10 +1,10 @@
 #!/usr/bin/perl
 
-=head NAME
+=head1 NAME
 
 gofer - execute multiple ssh sessions in parallel
 
-=head SYNOPSIS
+=head1 SYNOPSIS
 
     # This uses the file hosts.conf to define thie configuration,
     # and then reads and executes the commands in cmdfile on each host.
@@ -17,13 +17,13 @@ gofer - execute multiple ssh sessions in parallel
     # found, it will exit with an error.
     gofer cmdfile  
 
-=head DESCRIPTION
+=head1 DESCRIPTION
 
 This script will log in and execute commands on remote ssh servers.
 
 It is WORK-IN-PROGRESS!  Expect rough edges.
 
-=head CONNECTIONS DEFINITIONS
+=head1 CONNECTIONS DEFINITIONS
 
 An example connections configuration file.
 
@@ -35,7 +35,7 @@ An example connections configuration file.
     host4   user4@host4:873
     host5   user5:password5@host5:873
 
-=head CMDFILE
+=head1 CMDFILE
 
 An example command file:
 
@@ -54,6 +54,51 @@ An example command file:
 
     # All commands are run under /bin/sh, which must be present for
     # things to work
+
+
+=head1 EXAMPLE OUTPUT
+
+An example showing what you might get invoking:
+
+    ./gofer git-status.sh
+
+With C<git-status.sh> containing:
+
+   # bla de bla
+
+   sudo cd /root/configuration; git status
+
+And a C<.gofer.conf> containing:
+
+alpha    @alpha
+beta     @beta
+
+ 
+
+    ----[ alpha ]-----------------------------------------------------------
+      # bla de bla
+
+      $ sudo "cd /root/configuration; git status"
+    # On branch WORK_IN_PROGRESS
+    nothing to commit (working directory clean)
+
+    ----(4s elapsed)
+
+    ----[ beta ]------------------------------------------------------------
+      # bla de bla
+
+      $ sudo "cd /root/configuration; git status"
+    # On branch BETA_LOCAL_MODS
+    # Changed but not updated:
+    #   (use "git add <file>..." to update what will be committed)
+    #
+    #	modified:   foo/src/stuff.h
+    #
+    no changes added to commit (use "git add" and/or "git commit -a")
+
+    ----(4s elapsed)
+
+    done
 
 =cut
 
