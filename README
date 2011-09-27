@@ -1,0 +1,15 @@
+Somewhat like POE::Component::OpenSSH, SSH::Batch, Net::OpenSSH::Parallel etc, but:
+
+ - It is asynchonous, and non-blocking (it uses the AnyEvent and Coro frameworks).
+
+ - It aims to support sudoing smoothly
+
+I tried and failed to achieve parallel ssh with the the ability to
+sudo using the above tools.  Aditionally, so far I know there are no
+other parallel ssh-invoking tools based on AnyEvent.
+
+It is work in progress. Works for me so far, but expect rough edges.
+
+Feedback appreciated.
+
+See script/gofer for a working, hopefully usable example.
