@@ -70,9 +70,10 @@ With C<git-status.sh> containing:
 
 And a C<.gofer.conf> containing:
 
-alpha    @alpha
-beta     @beta
+    alpha    @alpha
+    beta     @beta
 
+Then you might get output like the following:
  
 
     ----[ alpha ]-----------------------------------------------------------
