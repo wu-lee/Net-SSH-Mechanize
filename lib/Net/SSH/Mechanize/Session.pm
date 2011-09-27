@@ -3,7 +3,6 @@ use Moose;
 use MooseX::Params::Validate;
 use AnyEvent;
 use Carp qw(croak);
-use MIME::Base64 ();
 our @CARP_NOT = qw(Net::SSH::Mechanize AnyEvent);
 
 extends 'AnyEvent::Subprocess::Running';
@@ -13,9 +12,10 @@ my $passwd_prompt_re = qr/assword:\s*/;
 my $initial_prompt_re = qr/^.*?\Q$ \E$/m;
 my $sudo_initial_prompt_re = qr/^.*?\Q$ \E$/m;
 
-# create a random text delimiter
-my $delim = MIME::Base64::encode_base64 rand;
-chomp $delim;
+# Create a random text delimiter
+my $delim = pack "A*", map int(rand 64), 1..20;
+$delim =~ tr/\x00-\x3f/A-Za-z0-9_-/;
+
 my $prompt = "$delim";
 
 my $sudo_passwd_prompt = "$delim-passwd";
