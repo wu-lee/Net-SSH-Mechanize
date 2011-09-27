@@ -1,93 +1,109 @@
-package Net::SSH::Mechanize::Subprocess;
+package Net::SSH::Mechanize::Multi;
 use Moose;
+use Net::SSH::Mechanize;
+use Carp qw(croak);
+use Coro;
 
 ######################################################################
 # attributes
 
-# FIXME need to think about how to allow switching a pty subprocess for another.
-# pty set_raw is currently hardwired in the factory class.
-
-has 'ssh_process_factory' => (
-    isa => 'Net::SSH::Mechanize::Subprocess',
+has 'ssh_instances' => (
+    isa => 'ArrayRef[Net::SSH::Mechanize]',
     is => 'ro',
-    lazy => 1,
-    default => sub {
-        return Net::SSH::Mechanize::Subprocess->default;
-    },
+    default => sub { [] },
 );
 
 
-has '_running_list' => (
-    isa => 'HashRef',
+has 'names' => (
+    isa => 'HashRef[Net::SSH::Mechanize]',
     is => 'ro',
     default => sub { +{} },
 );
 
 ######################################################################
 
-sub add_session {
-    my $self = shift;
-    my %args = @_;
+sub _to_ssh {
+    my @instances;
+    while(@_) {
+        my ($name, $connection) = splice @_, 0, 2;
+        $connection = Net::SSH::Mechanize::ConnectParams->new(%$connection)
+            if ref $connection eq 'HASH';
 
-    # FIXME validate args here
+        $connection = Net::SSH::Mechanize->new(connection_params => $connection)
+            if blessed $connection 
+                && $connection->isa('Net::SSH::Mechanize::ConnectParams');
+        
+        croak "Connection '$name' is not a hashref, Net::SSH::Mechanize::ConnectParams instance, nor a",
+            "Net::SSH::Mechanize instance (it is $connection)"
+                unless blessed $connection
+                    && $connection->isa('Net::SSH::Mechanize');
 
-    my $sessions = $self->sessions;
+        push @instances, $connection;
+    }
 
-    push @$sessions, \%args;
-
-    return $self;
+    return @instances;
 }
 
 
-
-
-sub login {
+sub add {
     my $self = shift;
+    croak "uneven number of name => connection parameters"
+        if @_ % 2;
 
-    my $sessions = $self->sessions;
-    my $running = $self->_running_list;
-    my $count = 0;
-    foreach my $session (@$sessions) {
-        my $id = refaddr $session->{_pid};
-        
-        my $subprocess = $running->{$id};
-        if ($subprocess) {
-            my $pid = $subprocess->child_pid;
-            warn "Session $id is already running with PID $pid, skipping it\n";
-            next;
-        }
-        
-        $running->{$id} = $self->spawn($session);
-        $count++;
-    }
+    my %new_instances = @_;
 
-    return $count;
-}
+    my @new_names = keys %new_instances;
+    my $names = $self->names;
+    my @defined = grep { $names->{$_} } @new_names;
 
+    croak "These names are already defined: @defined"
+        if @defined;
 
-
-sub capture {
-    my $self = shift;
-    my $cmd = shift;
-    my $result_cb = shift;
-
-    my $running = $self->_running_list;    
-    my %results;
-    foreach my $id (keys %$running) {
-
-        my $coro = async {
-            my $subprocess = $running->{$id};
-            # FIXME check this gets a usable result
-
-            my $pty = $subprocess->delegate('pty')->handle;
-            
-            sub logout {
-                push_write "exit\n";
-            }
-        };
-    }
+    my @new_instances = _to_ssh %new_instances;
     
+    my $instances = $self->ssh_instances;
+
+    @$names{@new_names} = @new_instances;
+    push @$instances, @new_instances;
+
+    return @new_instances;
 }
+
+
+sub in_parallel {
+    my $self = shift;
+    my $cb = pop;
+    croak "you must supply a callback"
+        unless ref $cb eq 'CODE';
+    
+    my @names = @_;
+    my $known_names = $self->names;
+    my @instances = map { $known_names->{$_} } @names;
+    if (@names != grep { defined } @instances) {
+        my @unknown = grep { !$known_names->{$_} } @names;
+        croak "These names are unknown: @unknown";
+    }
+
+    my @threads;
+    my $ix = 0;
+
+    foreach my $ix (0..$#instances) {
+        push @threads, async {
+            my $name = $names[$ix];
+            my $ssh = $instances[$ix];
+            
+            eval {
+                $cb->($name, $ssh);
+                1;
+            } or do {
+                print "error ($name): $@";
+            };
+        }
+    }
+
+    return \@threads;
+}
+
 
 
 __PACKAGE__->meta->make_immutable;

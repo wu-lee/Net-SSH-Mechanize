@@ -29,6 +29,17 @@ has 'connection_params' => (
 );
 
 
+has 'session' => (
+    isa => 'Net::SSH::Mechanize::Session',
+    is => 'ro',
+    lazy => 1,
+    default => sub {
+        shift->login;
+    },
+    handles => [qw(capture capture_async sudo_capture sudo_capture_async logout)],
+);
+
+
 around 'BUILDARGS' => sub {
     my $orig = shift;
     my $self = shift;

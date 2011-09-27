@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+
+=head NAME
+
+gofer - execute multiple ssh sessions in parallel
+
+=head SYNOPSIS
+
+    # This uses the file hosts.conf to define thie configuration,
+    # and then reads and executes the commands in cmdfile on each host.
+    gofer --config hosts.conf  cmdfile.
+
+    # This checks for .gofer.conf, $USER/.gofer.conf or
+    # /etc/gofer.conf, and uses the first one available to define the
+    # ssh connections, and then executes the commands defied in
+    # cmdfile on each host.  If this or the connections config is not
+    # found, it will exit with an error.
+    gofer cmdfile  
+
+=head DESCRIPTION
+
+This script will log in and execute commands on remote ssh servers.
+
+It is WORK-IN-PROGRESS!  Expect rough edges.
+
+=head CONNECTIONS DEFINITIONS
+
+An example connections configuration file.
+
+    # It can contain comments and blank lines
+    host1   @host1
+
+    host2   user2@host2
+    host3   user3:password3@host3
+    host4   user4@host4:873
+    host5   user5:password5@host5:873
+
+=head CMDFILE
+
+An example command file:
+
+    # It can contain comments and blank lines
+
+    # normal commands are executed as the user logged in
+    ls 
+
+    # Multiple commands can be combined
+    cd / ; ls
+    grep /etc/hosts | cat >file
+
+    # If the line starts with "sudo" then the rest of the line
+    # is executed within a sudo shell
+    sudo cd /root/configuration; git status
+
+    # All commands are run under /bin/sh, which must be present for
+    # things to work
+
+=cut
+
+use strict;
+use warnings;
+use Getopt::Long qw(:config posix_default);
+use Carp qw(croak);
+use IO::File;
+use List::Util qw(first);
+use FindBin '$Bin';
+use lib "$Bin/../local-lib/lib/perl5", "$Bin/../local-lib/lib/perl5/i486-linux-gnu-thread-multi", 
+    "$Bin/../lib";
+
+use Net::SSH::Mechanize::Multi;
+#use Net::SSH::Mechanize::Parse qw(parse_map);
+use Carp qw(croak);
+
+sub slurp {
+    my ($file) = @_;
+    my $fh = IO::File->new($file)
+        or croak "failed to open $file: $!";
+    local $/;
+    return <$fh>;
+}
+
+=head2 parse_map @lines_or_strings
+
+Parses a sequence of lines of the following form:
+
+    C<host   user:password@host:port>
+
+Returns an array of C<<($name => \%params)>> pairs, each defining a
+connection name and a parameter hash as accepted by
+C<<Net::SSH::Mechanize::ConnectParams->new>>, which can be passed
+directly to C<<Net::SSH::Mechanize::Multi->add>>.
+
+=cut
+
+sub parse_map {
+    my @map;
+    foreach my $str (@_) {
+        foreach (split '\n', $str) {
+            next if /^\s*#/;
+            next if /^\s*$/;
+            chomp;
+
+            my ($name, $connection) = split ' ', $_, 2;
+
+            my %params;
+            @params{qw(user password host port)} = 
+                $connection =~ m{^
+                                 (?:
+                                     ([^\s:]+)?
+                                     (?:
+                                         : (\S+)
+                                     )?
+                                 )?
+                                 @
+                                 (\S+?)
+                                 (?:
+                                     : (\d+)
+                                 )?
+                              $}x
+                    or croak "invalid connection spec '$connection'\n";
+
+            
+            defined $params{$_} or delete $params{$_}
+                for keys %params;
+            
+            push @map, $name, \%params;
+        }
+    }
+    
+
+    return @map;
+}
+
+my $config_path = first { -f } 
+    "$Bin/.gofer.conf", 
+    "$ENV{USER}/.gofer.conf",
+    "/etc/gofer.conf";
+
+
+GetOptions(
+    "--config=s" => sub {
+        my (undef, $val) = @_;
+        die "no such file '$val'\n"
+            unless -f $val;
+
+        $config_path = $val;
+    },
+)
+    or die "failed to parse options, stopping\n";
+
+die "no config file found, stopping. please supply one with --config option.\n"
+    unless defined $config_path;
+
+my %map = parse_map slurp $config_path;
+
+
+my $cmd_file = shift
+    or die "please supply a command file. stopping.\n";
+
+
+#use Data::Dumper; warn Dumper \%map; # DB
+my $manager = Net::SSH::Mechanize::Multi->new;
+$manager->add(%map);
+
+
+
+sub execute_script {
+    my $ssh = shift;
+
+    my @results;
+    foreach my $str (@_) {
+        foreach (split '\n', $str) {
+            if (/^\s*#/ || /^\s*$/) {
+                push @results, "  $_\n";
+                next;
+            }
+
+            chomp;
+            if (s/^\s*sudo\s*//) {
+                
+                push @results, qq(  \$ sudo "$_"\n);
+                my $result = $ssh->sudo_capture($_);
+
+                push @results, "$result\n"
+                    if $result;
+            }
+            else {
+                push @results, qq(  \$ $_\n);
+                my $result = $ssh->capture($_);
+
+                push @results, "$result\n"
+                    if $result;
+            }
+        }
+    }
+    return \@results;
+}
+
+
+my $cmds = slurp $cmd_file;
+
+my $threads = $manager->in_parallel(keys %map => sub {
+    my ($name, $ssh) = @_;
+    my $start = time;
+
+    my $results = execute_script $ssh, $cmds;
+
+    print "----[ $name ]", '-'x(64 - length $name), "\n";
+    print @$results;
+    my $elapsed = time - $start;
+    print "----(${elapsed}s elapsed)\n\n";
+});
+
+$_->join for @$threads;
+
+print "done";
