@@ -19,7 +19,7 @@ our @CARP_NOT = qw(AnyEvent AnyEvent::Subprocess Coro::AnyEvent);
 #$AnyEvent::Log::FILTER->level("fatal");
 
 
-my @connection_params = qw(host user port);
+my @connection_params = qw(host user port password);
 
 
 has 'connection_params' => (
@@ -36,26 +36,35 @@ around 'BUILDARGS' => sub {
     my $params = $self->$orig(@_);
 
     # check for connection_params paramter
+    my $cp;
     if (exists $params->{connection_params}) {
-
+        # Prevent duplication of parameters - if we have a connection_params
+        # parameter, forbid the shortcut alternatives.
         foreach my $param (@connection_params) {
             croak "Cannot specify both $param and connection_params parameters"
                 if exists $params->{$param};
         }
 
-        return $params; # as is
+        $cp = $params->{connection_params};
+        $cp = Net::SSH::Mechanize::ConnectParams->new($cp)
+                if ref $cp eq 'HASH';
+    }
+    else {
+        # Splice the short-cut @connection_params out of %$params and into %cp_params
+        my %cp_params;
+        foreach my $param (@connection_params) {
+            next unless exists $params->{$param};
+            $cp_params{$param} = delete $params->{$param};
+        }
+
+        # Try and construct a ConnectParams instance
+        $cp = Net::SSH::Mechanize::ConnectParams->new(%cp_params);
     }
 
-    # Splice @connection_params out of %$params and into %cp_params
-    my %cp_params;
-    foreach my $param (@connection_params) {
-        next unless exists $params->{$param};
-        $cp_params{$param} = $params->{$param};
-    }
-
-    # Try and construct a ConnectParams instance
-    my $cp = Net::SSH::Mechanize::ConnectParams->new(%cp_params);
-    return {%$params, connection_params => $cp};
+    return {
+        %$params, 
+        connection_params => $cp,
+    };
 };
 
 
@@ -70,15 +79,15 @@ sub login_async {
     my $session;
     my $job = AnyEvent::Subprocess->new(
         run_class => 'Net::SSH::Mechanize::Session',
-            delegates => [
-                'Pty', 
-                'CompletionCondvar',
-                [Handle => {
-                    name      => 'stderr',
-                    direction => 'r',
+        delegates => [
+            'Pty', 
+            'CompletionCondvar',
+            [Handle => {
+                name      => 'stderr',
+                direction => 'r',
                 replace   => \*STDERR,
-                }],
-            ],
+            }],
+        ],
         on_completion => sub {
             my $done = shift;
             
@@ -92,12 +101,16 @@ sub login_async {
             undef $session;
         },
         code  => sub { 
-            my $args = shift;
-            my $cp = $args->{params};
-            exec $cp->ssh_cmd;
+            my $cmd = shift->{cmd};
+            exec @$cmd;
         },
     );
-    $session = $job->run({params => $self->connection_params});
+    $session = $job->run({cmd => [$self->connection_params->ssh_cmd]});
+    
+    # Tack this on afterwards, mainly to supply the password.  We
+    # can't add it to the constructor above because of the design of
+    # AnyEvent::Subprocess.
+    $session->connection_params($self->connection_params);
 
     # turn off terminal echo
     $session->delegate('pty')->handle->fh->set_raw;

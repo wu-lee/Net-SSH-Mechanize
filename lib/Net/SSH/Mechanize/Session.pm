@@ -8,7 +8,7 @@ our @CARP_NOT = qw(Net::SSH::Mechanize AnyEvent);
 
 extends 'AnyEvent::Subprocess::Running';
 
-my $passwd_prompt_re = qr/:\s*/;
+my $passwd_prompt_re = qr/assword:\s*/;
 
 my $initial_prompt_re = qr/^.*?\Q$ \E$/m;
 my $sudo_initial_prompt_re = qr/^.*?\Q$ \E$/m;
@@ -27,11 +27,42 @@ my $sudo_passwd_prompt_re = qr/^$sudo_passwd_prompt$/;
 
 my $login_timeout_secs = 10;
 
+has 'connection_params' => (
+    isa => 'Net::SSH::Mechanize::ConnectParams',
+    is => 'rw',
+    # Note: this made rw and unrequired so that it can be supplied
+    # after AnyEvent::Subprocess::Job constructs the instance
+);
+
 has '_error_event' => (
     is => 'rw',
     isa => 'AnyEvent::CondVar',
     default => sub { return AnyEvent->condvar },
 );
+
+
+
+# helper function
+
+sub _croak_with {
+    my ($msg, $cv) = @_;
+    sub {
+        my $h = shift;
+        return unless my $text = $h->rbuf;
+        $h->{rbuf} = '';
+        $cv->croak("$msg: $text");
+    }
+}
+
+sub _warn_with {
+    my ($msg) = @_;
+    sub {
+        my $h = shift;
+        return unless my $text = $h->rbuf;
+        $h->{rbuf} = '';
+        warn "$msg: $text";
+    }
+}
 
 sub _push_write {
     my $handle = shift;
@@ -41,7 +72,6 @@ sub _push_write {
 }
 
 
-# helper function
 sub _match {
     my $handle = shift;
     my $re = shift;
@@ -52,7 +82,7 @@ sub _match {
         return;
     }
 
-#    print qq(matching $re with: "$handle->{rbuf}"\n); # DB
+#    printf qq(matching $re with: "%s"\n), substr $handle->{rbuf}, 0, $+[0]; # DB
 
     substr $handle->{rbuf}, 0, $+[0], "";
     return @captures;
@@ -75,7 +105,7 @@ sub _define_automation {
 
 #        printf "after: state is %s %s\n", $function, $state; # DB 
         if (!$states->{$state}) { # terminal state, stop reading
-#            $stderr->on_read(); # cancel errors on stderr
+#            $stderr->on_read(undef); # cancel errors on stderr
             $stdin->{rbuf} = '';
             return 1;
         }
@@ -94,10 +124,6 @@ sub _define_automation {
 
 sub login_async {
     my $self = shift;
-    my ($passwd) = pos_validated_list(
-        \@_,
-        { isa => 'Str' }, # fixme should be optional
-    );
     my $done = AnyEvent->condvar;
 
     my $stdin = $self->delegate('pty')->handle;
@@ -119,20 +145,22 @@ sub login_async {
     );
 
     # capture stderr output, interpret as an error
-    $stderr->on_read(sub {
-        return unless my $text = shift->rbuf;
-        $done->croak("error: $text");
-    });
+    $stderr->on_read(_croak_with "error" => $done);
 
     $self->_define_automation(
         start => sub {
             if (_match($stdin => $passwd_prompt_re)) {
+                if (!$self->connection_params->has_password) {
+                    $done->croak('password requested but none provided');
+                    return 'auth_failure';
+                }
+                my $passwd = $self->connection_params->password;
                 _push_write($stdin => "$passwd\n");
                 return 'sent_passwd';
             }
             
             if (_match($stdin => $initial_prompt_re)) {
-                _push_write($stdin => qq(PS1="$prompt"; export PS1\n));
+                _push_write($stdin => qq(PS1=$prompt; export PS1\n));
                 return 'expect_prompt';
             }
             # FIXME limit buffer size and time
@@ -147,7 +175,7 @@ sub login_async {
             }
             
             if (_match($stdin => $initial_prompt_re)) {
-                _push_write($stdin => qq(PS1="$prompt"; export PS1\n));
+                _push_write($stdin => qq(PS1=$prompt; export PS1\n));
                 return 'expect_prompt';
             }
             
@@ -157,7 +185,7 @@ sub login_async {
         expect_prompt => sub {
             if (_match($stdin => $prompt_re)) {
                 # Cancel stderr monitor
-                $stderr->on_read();
+                $stderr->on_read(undef);
 
                 $done->send($stdin, $self); # done
                 return 'finished';
@@ -189,6 +217,7 @@ sub capture_async {
     );
 
     my $stdin = $self->delegate('pty')->handle;
+    my $stderr = $self->delegate('stderr')->handle;
 
     $cmd =~ s/\s*\z/\n/ms;
 
@@ -206,6 +235,9 @@ sub capture_async {
         $done->croak(shift->recv);
     });
 
+    # capture stderr output, interpret as a warning
+    $stderr->on_read(_warn_with "unexpected stderr from command");
+
     my $read_output_cb = sub {
         my ($handle) = @_;
         return unless defined $handle->{rbuf};
@@ -217,6 +249,9 @@ sub capture_async {
         
         $cumdata =~ /(.*?)$prompt_re/ms
             or return;
+
+        # cancel stderr monitor
+        $stderr->on_read(undef);
 
         $done->send($handle, $1);
         return 1;
@@ -235,16 +270,22 @@ sub capture {
 
 sub sudo_capture_async {
     my $self = shift;
-    my ($cmd, $passwd) = pos_validated_list(
+    my ($cmd) = pos_validated_list(
         \@_,
         { isa => 'Str' },
-        { isa => 'Str' },
     );
+
     my $done = AnyEvent->condvar;
     $self->_error_event->cb(sub { 
 #        print "_error_event sent\n"; DB
         $done->croak(shift->recv);
     });
+
+    # we know we'll need the password, so check this up-front
+    if (!$self->connection_params->has_password) {
+        $done->croak('password requested but none provided');
+        return 'auth_failure';
+    }
 
     my $stdin = $self->delegate('pty')->handle;
     my $stderr = $self->delegate('stderr')->handle;
@@ -260,10 +301,7 @@ sub sudo_capture_async {
     );
 
     # capture stderr output, interpret as an error
-    $stderr->on_read(sub {
-        return unless my $text = shift->rbuf;
-        $done->croak("error: $text");
-    });
+    $stderr->on_read(_croak_with "error" => $done);
 
     # ensure command has a trailing newline
     $cmd =~ s/\s*\z/\n/ms;
@@ -282,6 +320,7 @@ sub sudo_capture_async {
     $self->_define_automation(
         start => sub {
             if (_match($stdin => $sudo_passwd_prompt_re)) {
+                my $passwd = $self->connection_params->password;
 #                print "sending password\n"; # DB
                 _push_write($stdin => "$passwd\n");
                 return 'sent_passwd';
@@ -299,26 +338,17 @@ sub sudo_capture_async {
             }
             
             if (_match($stdin => $prompt_re)) {
-                _push_write($stdin => qq(PS1="$prompt"; export PS1\n));
-                return 'expect_sudo_prompt';
+                # Cancel stderr monitor
+                $stderr->on_read(undef);
+
+                _push_write($stdin => $cmd);
+                return 'sent_cmd';
             }
             
             return 'sent_passwd';
         },
         
-        expect_sudo_prompt => sub {
-            if (_match($stdin => $prompt_re)) {
-                # Cancel stderr monitor
-                $stderr->on_read();
-
-                _push_write($stdin => $cmd);
-                return 'expect_prompt';
-            }
-            
-            return 'expect_sudo_prompt';
-        },
-        
-        expect_prompt => sub {
+        sent_cmd => sub {
             if (my ($data) = _match($stdin => qr/(.*?)$prompt_re/sm)) {
                 $cumdata .= $data;
 #                print "got data: $data\n<$stdin->{rbuf}>\n"; # DB
@@ -326,10 +356,7 @@ sub sudo_capture_async {
                 $stdin->{rbuf} = '';
 
                 # capture stderr output, interpret as a warning
-                $stderr->on_read(sub {
-                    return unless my $text = shift->rbuf;
-                     warn "error on exiting: $text";
-                });
+                $stderr->on_read(_warn_with "unexpected stderr from sudo command");
 
                 # exit sudo shell
                 _push_write($stdin => "exit\n");
@@ -339,13 +366,13 @@ sub sudo_capture_async {
             
             $cumdata .= $stdin->{rbuf};
             $stdin->{rbuf} = '';
-            return 'expect_prompt';
+            return 'send_cmd';
         },
 
         exited_shell => sub {
             if (_match($stdin => $prompt_re)) {
                 # Cancel stderr monitor
-                $stderr->on_read();
+                $stderr->on_read(undef);
 
                 # remove any output from the exit
                 # FIXME should this check that everything has been consumed?

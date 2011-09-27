@@ -3,39 +3,30 @@ use strict;
 use warnings;
 use Test::More;
 use FindBin qw($Bin);
-use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib";
+use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib", "$Bin/lib";
 use File::Slurp qw(slurp);
 use Coro;
 
 use Net::SSH::Mechanize;
-use Coro::Debug;
-
-
-my $passwd = $ENV{PASSWD}
-    or die "you must define the PASSWD environment variable";
-
+use MyTest::Mock::ConnectParams;
 
 my $threads = 10;
 
 my @exchanges = (
     [q(id),
      qr/uid=\d+\(\S+\) gid=\d+\(\S+\)/],
-    [qq(ls $Bin/data/01.single-capture.t),
-     qr/\Aa\s+b\s+c\s*\z/sm],
+    [q(printf "stdout output\n" ; printf >&2 "stderr output\n" ),
+     qr/\Astdout output\n\z/m], # FIXME what's up here?
     [q(printf "eoled\nnot eoled"),
      qr/\Aeoled\nnot eoled\z/sm],
-    [q(cat /etc/shadow | grep root),
-     qr{cat: /etc/shadow: Permission denied}],
 );
 
 plan tests => @exchanges * $threads + 2;
 
-my %connection = (
-    host => 'localhost',
-#    host => 'aruna.interactive.co.uk',
-#    host => 'auriga',
-);
-my (@ssh) = map { Net::SSH::Mechanize->new(%connection) } 1..$threads;
+my (@ssh) = map { 
+    Net::SSH::Mechanize->new(connection_params => MyTest::Mock::ConnectParams->detect);
+} 1..$threads;
+
 is @ssh, $threads, "number of subprocesses is $threads";
 
 my @threads;
@@ -45,9 +36,9 @@ foreach my $ix (1..@ssh) {
         my $id = $ix;
         my $ssh = $ssh[$id-1];
         note "(thread=$ix) starting";
-            $id == 11 and Coro::Debug::trace;
+
         eval {
-            my $session = $ssh->login($passwd);
+            my $session = $ssh->login;
             note "(thread=$ix) logged in";  
             foreach my $exchange (@exchanges) {
                 my ($cmd, $expect) = @$exchange;

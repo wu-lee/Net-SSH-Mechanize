@@ -12,6 +12,12 @@ has 'user' => (
     is => 'rw',
 );
 
+has 'password' => (
+    isa => 'Str',
+    is => 'rw',
+    predicate => 'has_password',
+);
+
 has 'port' => (
     isa => 'Int',
     is => 'rw',
