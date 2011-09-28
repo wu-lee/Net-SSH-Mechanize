@@ -283,8 +283,7 @@ sub sudo_capture_async {
 
     # we know we'll need the password, so check this up-front
     if (!$self->connection_params->has_password) {
-        $done->croak('password requested but none provided');
-        return 'auth_failure';
+        croak 'password requested but none provided';
     }
 
     my $stdin = $self->delegate('pty')->handle;
