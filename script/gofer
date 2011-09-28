@@ -214,7 +214,7 @@ sub execute_script {
     my $ssh = shift;
 
     my @results;
-    foreach my $str (@_) {
+    LOOP: foreach my $str (@_) {
         foreach (split '\n', $str) {
             if (/^\s*#/ || /^\s*$/) {
                 push @results, "  $_\n";
@@ -225,17 +225,30 @@ sub execute_script {
             if (s/^\s*sudo\s*//) {
                 
                 push @results, qq(  \$ sudo "$_"\n);
-                my $result = $ssh->sudo_capture($_);
+                eval {
+                    my $result = $ssh->sudo_capture($_);
 
-                push @results, "$result\n"
-                    if $result;
+                    push @results, "$result\n"
+                        if $result;
+                    1;
+                } or do {
+                    push @results, my $err = $@;
+                    last LOOP;
+                }
             }
             else {
                 push @results, qq(  \$ $_\n);
-                my $result = $ssh->capture($_);
+                eval {
+                    my $result = $ssh->capture($_);
 
-                push @results, "$result\n"
-                    if $result;
+                    push @results, "$result\n"
+                        if $result;
+                    1;
+                } or do {
+                    push @results, my $err = $@;
+                    last LOOP;
+                }
+
             }
         }
     }
