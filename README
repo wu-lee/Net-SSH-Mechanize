@@ -5,41 +5,108 @@ VERSION
     This document describes Net::SSH::Mechanize version 0.1
 
 SYNOPSIS
+    Somewhat like POE::Component::OpenSSH, SSH::Batch,
+    Net::OpenSSH::Parallel etc, but:
+
+    *   It uses the asynchonous "AnyEvent" event framework.
+
+    *   It aims to support sudoing smoothly.
+
+    Synchronous usage:
+
         use Net::SSH::Mechanize;
 
+        # Create an instance. This will not log in yet.
+        # All but the host name below are optional.
+        # Your .ssh/config will be used as normal, so if you 
+        # define ssh settings for a host there they will be picked up.
+        my $ssh = Net::SSH::Mechanize->new(
+            host => 'somewhere.com',
+            user => 'jbloggs',
+            password => 'secret',
+            port => 22,
+        );
+
+        # Accessing ->capture calls ->login automatically.
+        my $output = $ssh->capture("id");
+
+        # If successful, $output now contains something like:
+        # uid=1000(jbloggs) gid=1000(jbloggs) groups=1000(jbloggs)
+
+        $output = $ssh->sudo_capture("id");
+
+        # If successful, $output now contains something like:
+        # uid=0(root) gid=0(root) groups=0(root)
+
+        $ssh->logout;
+
+    See below for further examples, and script/gofer in the distribution
+    source for a working, hopefully usable example.
+
+    This is work in progress. Feedback appreciated.
+
 DESCRIPTION
-INTERFACE
-DIAGNOSTICS
-    "Error message here, perhaps with %s placeholders"
-        [Description of error here]
+    The point about using "AnyEvent" internally is that "blocking" method
+    calls only block the current "thread", and so the above can be used in
+    parallel with (for example) other ssh sessions in the same process
+    (using "AnyEvent", or "Coro"). Although a sub-process is spawned for
+    each ssh command, the parent process manages the child processes
+    asynchronously, without blocking or polling.
 
-    "Another error message here"
-        [Description of error here]
+    Here is an example of asynchronous usage, using the
+    "<AnyEvent-"condvar>> API. Calls return an "<AnyEvent::CondVar">
+    instance, which you can call the usual "->recv" and "->cb" methods on to
+    perform a blocking wait (within the current thread), or assign a
+    callback to be called on completion (respectively). See AnyEvent.
 
-        [Et cetera, et cetera]
+    This is effectively what the example in the synopsis is doing, behind
+    the scenes.
 
-CONFIGURATION AND ENVIRONMENT
-    Net::SSH::Mechanize requires no configuration files or environment
-    variables.
+        use Net::SSH::Mechanize;
 
-DEPENDENCIES
-    None.
+        # Create an instance, as above.
+        my $ssh = Net::SSH::Mechanize->new(
+            host => 'somewhere.com',
+            user => 'jbloggs',
+            password => 'secret',
+            port => 22,
+        );
 
-INCOMPATIBILITIES
-    None reported.
+        # Accessing ->capture calls ->login automatically.
+        my $condvar = AnyEvent->condvar;
+        $ssh->login_async->cb(sub {
+            my ($session) = shift->recv;
+            $session->capture_async("id")->cb(sub {
+                my ($stderr_handle, $result) = shift->recv;
 
-BUGS AND LIMITATIONS
-    No bugs have been reported.
+                $condvar->send($result);
+            });
+        });
 
-    Please report any bugs or feature requests to
-    "bug-Net-SSH-Mechanize@rt.cpan.org", or through the web interface at
-    <http://rt.cpan.org>.
+        # ... this returns immediately.  The callbacks assigned will get
+        # invoked behind the scenes, and we just need to wait and collect
+        # the result handed to our $condvar.
+
+        my $result = $convar->recv;
+
+        # If successful, $output now contains something like:
+        # uid=1000(jbloggs) gid=1000(jbloggs) groups=1000(jbloggs)
+
+        $ssh->logout;
+
+    You would only need to use this asynchronous style if you wanted to
+    interface with AnyEvent, and/or add some "Expect"-like interaction into
+    the code.
+
+    However, see also Net::SSH::Mechanize::Multi for a more convenient way
+    of running multiple ssh sessions in parallel. It uses Coro to provide a
+    (cooperatively) threaded model.
 
 AUTHOR
-    Nick Woolley "<npw@cpan.org>"
+    Nick Stokoe "<npw@cpan.org>"
 
 LICENCE AND COPYRIGHT
-    Copyright (c) 2011, Nick Woolley "<npw@cpan.org>". All rights reserved.
+    Copyright (c) 2011, Nick Stokoe "<npw@cpan.org>". All rights reserved.
 
     This module is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself. See perlartistic.

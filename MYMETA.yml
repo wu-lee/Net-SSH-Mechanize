@@ -4,6 +4,8 @@ author:
   - 'Nick Woolley <npw@cpan.org>'
 build_requires:
   Module::Build: 0.28
+configure_requires:
+  Module::Build: 0.38
 dynamic_config: 0
 generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.112580'
 license: artistic
@@ -11,6 +13,22 @@ meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
 name: Net-SSH-Mechanize
+provides:
+  Coro::AnyEvent:
+    file: lib/Net/SSH/Mechanize.pm
+    version: 0
+  Net::SSH::Mechanize:
+    file: lib/Net/SSH/Mechanize.pm
+    version: v0.1.0
+  Net::SSH::Mechanize::ConnectParams:
+    file: lib/Net/SSH/Mechanize/ConnectParams.pm
+    version: 0
+  Net::SSH::Mechanize::Multi:
+    file: lib/Net/SSH/Mechanize/Multi.pm
+    version: 0
+  Net::SSH::Mechanize::Session:
+    file: lib/Net/SSH/Mechanize/Session.pm
+    version: 0
 recommends:
   File::Slurp: 0
   Test::Pod: 1.14

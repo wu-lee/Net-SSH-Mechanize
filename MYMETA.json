@@ -19,6 +19,11 @@
             "Module::Build" : "0.28"
          }
       },
+      "configure" : {
+         "requires" : {
+            "Module::Build" : "0.38"
+         }
+      },
       "runtime" : {
          "recommends" : {
             "File::Slurp" : 0,
@@ -34,6 +39,28 @@
             "Test::More" : 0,
             "version" : "0.77"
          }
+      }
+   },
+   "provides" : {
+      "Coro::AnyEvent" : {
+         "file" : "lib/Net/SSH/Mechanize.pm",
+         "version" : 0
+      },
+      "Net::SSH::Mechanize" : {
+         "file" : "lib/Net/SSH/Mechanize.pm",
+         "version" : "v0.1.0"
+      },
+      "Net::SSH::Mechanize::ConnectParams" : {
+         "file" : "lib/Net/SSH/Mechanize/ConnectParams.pm",
+         "version" : 0
+      },
+      "Net::SSH::Mechanize::Multi" : {
+         "file" : "lib/Net/SSH/Mechanize/Multi.pm",
+         "version" : 0
+      },
+      "Net::SSH::Mechanize::Session" : {
+         "file" : "lib/Net/SSH/Mechanize/Session.pm",
+         "version" : 0
       }
    },
    "release_status" : "stable",

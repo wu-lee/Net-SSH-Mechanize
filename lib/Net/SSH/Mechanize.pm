@@ -163,114 +163,121 @@ This document describes Net::SSH::Mechanize version 0.1
 
 =head1 SYNOPSIS
 
-    use Net::SSH::Mechanize;
+Somewhat like POE::Component::OpenSSH, SSH::Batch, Net::OpenSSH::Parallel etc, but:
 
-=for author to fill in:
-    Brief code example(s) here showing commonest usage(s).
-    This section will be as far as many users bother reading
-    so make it as educational and exeplary as possible.
-  
-  
-=head1 DESCRIPTION
+=over 4
 
-=for author to fill in:
-    Write a full description of the module and its features here.
-    Use subsections (=head2, =head3) as appropriate.
+=item *
 
+It uses the asynchonous C<AnyEvent> event framework.
 
-=head1 INTERFACE 
+=item *
 
-=for author to fill in:
-    Write a separate section listing the public components of the modules
-    interface. These normally consist of either subroutines that may be
-    exported, or methods that may be called on objects belonging to the
-    classes provided by the module.
-
-
-=head1 DIAGNOSTICS
-
-=for author to fill in:
-    List every single error and warning message that the module can
-    generate (even the ones that will "never happen"), with a full
-    explanation of each problem, one or more likely causes, and any
-    suggested remedies.
-
-=over
-
-=item C<< Error message here, perhaps with %s placeholders >>
-
-[Description of error here]
-
-=item C<< Another error message here >>
-
-[Description of error here]
-
-[Et cetera, et cetera]
+It aims to support sudoing smoothly.
 
 =back
 
+Synchronous usage:
 
-=head1 CONFIGURATION AND ENVIRONMENT
+    use Net::SSH::Mechanize;
 
-=for author to fill in:
-    A full explanation of any configuration system(s) used by the
-    module, including the names and locations of any configuration
-    files, and the meaning of any environment variables or properties
-    that can be set. These descriptions must also include details of any
-    configuration language used.
+    # Create an instance. This will not log in yet.
+    # All but the host name below are optional.
+    # Your .ssh/config will be used as normal, so if you 
+    # define ssh settings for a host there they will be picked up.
+    my $ssh = Net::SSH::Mechanize->new(
+        host => 'somewhere.com',
+        user => 'jbloggs',
+        password => 'secret',
+        port => 22,
+    );
+
+    # Accessing ->capture calls ->login automatically.
+    my $output = $ssh->capture("id");
+
+    # If successful, $output now contains something like:
+    # uid=1000(jbloggs) gid=1000(jbloggs) groups=1000(jbloggs)
+
+    $output = $ssh->sudo_capture("id");
+
+    # If successful, $output now contains something like:
+    # uid=0(root) gid=0(root) groups=0(root)
+
+    $ssh->logout;
+
+See below for further examples, and script/gofer in the distribution
+source for a working, hopefully usable example.
+
+This is work in progress.  Feedback appreciated.
+
   
-Net::SSH::Mechanize requires no configuration files or environment variables.
+=head1 DESCRIPTION
 
+The point about using C<AnyEvent> internally is that "blocking" method
+calls only block the current "thread", and so the above can be used in
+parallel with (for example) other ssh sessions in the same process
+(using C<AnyEvent>, or C<Coro>). Although a sub-process is spawned for
+each ssh command, the parent process manages the child processes
+asynchronously, without blocking or polling.
 
-=head1 DEPENDENCIES
+Here is an example of asynchronous usage, using the
+C<<AnyEvent->condvar>> API.  Calls return an C<<AnyEvent::CondVar>>
+instance, which you can call the usual C<< ->recv >> and C<< ->cb >>
+methods on to perform a blocking wait (within the current thread), or
+assign a callback to be called on completion (respectively).  See
+L<AnyEvent>.
 
-=for author to fill in:
-    A list of all the other modules that this module relies upon,
-    including any restrictions on versions, and an indication whether
-    the module is part of the standard Perl distribution, part of the
-    module's distribution, or must be installed separately. ]
+This is effectively what the example in the synopsis is doing, behind
+the scenes.
 
-None.
+    use Net::SSH::Mechanize;
 
+    # Create an instance, as above.
+    my $ssh = Net::SSH::Mechanize->new(
+        host => 'somewhere.com',
+        user => 'jbloggs',
+        password => 'secret',
+        port => 22,
+    );
 
-=head1 INCOMPATIBILITIES
+    # Accessing ->capture calls ->login automatically.
+    my $condvar = AnyEvent->condvar;
+    $ssh->login_async->cb(sub {
+        my ($session) = shift->recv;
+        $session->capture_async("id")->cb(sub {
+            my ($stderr_handle, $result) = shift->recv;
 
-=for author to fill in:
-    A list of any modules that this module cannot be used in conjunction
-    with. This may be due to name conflicts in the interface, or
-    competition for system or program resources, or due to internal
-    limitations of Perl (for example, many modules that use source code
-    filters are mutually incompatible).
+            $condvar->send($result);
+        });
+    });
 
-None reported.
+    # ... this returns immediately.  The callbacks assigned will get
+    # invoked behind the scenes, and we just need to wait and collect
+    # the result handed to our $condvar.
 
+    my $result = $convar->recv;
 
-=head1 BUGS AND LIMITATIONS
+    # If successful, $output now contains something like:
+    # uid=1000(jbloggs) gid=1000(jbloggs) groups=1000(jbloggs)
 
-=for author to fill in:
-    A list of known problems with the module, together with some
-    indication Whether they are likely to be fixed in an upcoming
-    release. Also a list of restrictions on the features the module
-    does provide: data types that cannot be handled, performance issues
-    and the circumstances in which they may arise, practical
-    limitations on the size of data sets, special cases that are not
-    (yet) handled, etc.
+    $ssh->logout;
 
-No bugs have been reported.
+You would only need to use this asynchronous style if you wanted to
+interface with AnyEvent, and/or add some C<Expect>-like interaction
+into the code.
 
-Please report any bugs or feature requests to
-C<bug-Net-SSH-Mechanize@rt.cpan.org>, or through the web interface at
-L<http://rt.cpan.org>.
-
+However, see also L<Net::SSH::Mechanize::Multi> for a more convenient
+way of running multiple ssh sessions in parallel.  It uses Coro to
+provide a (cooperatively) threaded model.
 
 =head1 AUTHOR
 
-Nick Woolley  C<< <npw@cpan.org> >>
+Nick Stokoe  C<< <npw@cpan.org> >>
 
 
 =head1 LICENCE AND COPYRIGHT
 
-Copyright (c) 2011, Nick Woolley C<< <npw@cpan.org> >>. All rights reserved.
+Copyright (c) 2011, Nick Stokoe C<< <npw@cpan.org> >>. All rights reserved.
 
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.

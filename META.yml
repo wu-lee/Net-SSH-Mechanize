@@ -1,7 +1,7 @@
 ---
-abstract: 'asynchronous ssh command invocation'
+abstract: 'Asynchronous ssh command invocation'
 author:
-  - 'Nick Woolley <npw@cpan.org>'
+  - 'Nick Stokoe <npw@cpan.org>'
 build_requires:
   Module::Build: 0.28
 configure_requires:
