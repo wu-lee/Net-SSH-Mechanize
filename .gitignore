@@ -1,3 +1,17 @@
+*#
+*.bak
+*.tmp
 *~
+/Build
+/_build*
+/blib*
+/nytprof
+/pm_to_blib*
+/pod2htmd.tmp
+/pod2htmi.tmp
+/t/temp*
+Makefile.PL
+Net-SSH-Mechanize-*
+tmp*
 local-lib
 script/.gofer.conf

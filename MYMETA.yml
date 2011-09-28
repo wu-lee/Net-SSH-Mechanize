@@ -1,0 +1,28 @@
+---
+abstract: 'asynchronous ssh command invocation'
+author:
+  - 'Nick Woolley <npw@cpan.org>'
+build_requires:
+  Module::Build: 0.28
+dynamic_config: 0
+generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.112580'
+license: artistic
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Net-SSH-Mechanize
+recommends:
+  File::Slurp: 0
+  Test::Pod: 1.14
+  Test::Pod::Coverage: 1.04
+requires:
+  AnyEvent: 0
+  AnyEvent::Subprocess: 0
+  Coro: 0
+  Moose: 0
+  MooseX::Params::Validate: 0
+  Test::More: 0
+  version: 0.77
+resources:
+  license: http://opensource.org/licenses/artistic-license.php
+version: v0.1.0

@@ -1,0 +1,4 @@
+make ./Build
+makefile_PL Build.PL
+makefile Build
+cpan_user NPW
