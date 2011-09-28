@@ -140,7 +140,7 @@ sub login_async {
         cb    => sub { 
             undef $timeout;
 #            print "timing out login\n"; # DB
-            $done->croak("Login timed out after $login_timeout_secs seconds");
+            $done->croak("login timed out after $login_timeout_secs seconds");
         },
     );
 
@@ -295,7 +295,7 @@ sub sudo_capture_async {
         cb    => sub { 
             undef $timeout;
 #            print "timing out login\n"; # DB
-            $done->croak("Login timed out after $login_timeout_secs seconds");
+            $done->croak("sudo_capture timed out after $login_timeout_secs seconds");
         },
     );
 
