@@ -5,6 +5,12 @@
    ],
    "dynamic_config" : 1,
    "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.112580",
+   "keywords" : [
+      "anyevent",
+      "ssh",
+      "coro",
+      "sudo"
+   ],
    "license" : [
       "artistic_1"
    ],
@@ -21,12 +27,11 @@
       },
       "configure" : {
          "requires" : {
-            "Module::Build" : "0.38"
+            "Module::Build" : "0.28"
          }
       },
       "runtime" : {
          "recommends" : {
-            "File::Slurp" : 0,
             "Test::Pod" : "1.14",
             "Test::Pod::Coverage" : "1.04"
          },
@@ -67,7 +72,10 @@
    "resources" : {
       "license" : [
          "http://opensource.org/licenses/artistic-license.php"
-      ]
+      ],
+      "repository" : {
+         "url" : "https://github.com/wu-lee/Net-SSH-Mechanize"
+      }
    },
    "version" : "v0.1.0"
 }
