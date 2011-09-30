@@ -272,4 +272,4 @@ my $threads = $manager->in_parallel(keys %map => sub {
 
 $_->join for @$threads;
 
-print "done";
+print "done\n";
