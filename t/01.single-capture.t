@@ -4,7 +4,6 @@ use warnings;
 use Test::More tests => 3;
 use FindBin qw($Bin);
 use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib", "$Bin/lib";
-use File::Slurp qw(slurp);
 
 use Net::SSH::Mechanize;
 use MyTest::Mock::ConnectParams;

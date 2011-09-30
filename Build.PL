@@ -44,7 +44,6 @@ my $builder = Module::Build->new
      {
          'Test::Pod' => 1.14,
          'Test::Pod::Coverage' => 1.04,
-         'File::Slurp' => 0, # FIXME remove this dep
      },
      test_files         => [ rscan_dir('t', '\.t$'),
                              rscan_dir('xt', '\.t$') ],

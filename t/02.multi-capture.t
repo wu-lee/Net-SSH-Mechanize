@@ -4,7 +4,6 @@ use warnings;
 use Test::More;
 use FindBin qw($Bin);
 use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib", "$Bin/lib";
-use File::Slurp qw(slurp);
 use Coro;
 
 use Net::SSH::Mechanize;
