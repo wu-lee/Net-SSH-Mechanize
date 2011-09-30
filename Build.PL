@@ -26,6 +26,15 @@ my $builder = Module::Build->new
      dist_abstract       => 'Asynchronous ssh command invocation',
      create_readme       => 1,
      create_makefile_pl  => 'traditional',
+     meta_merge          =>
+     {
+         resources =>
+         {
+             repository =>
+                'https://github.com/wu-lee/Net-SSH-Mechanize',
+        },
+        keywords  => [ 'anyevent', 'ssh', 'coro', 'sudo' ],
+     },
      configure_requires => 
      {
          'Module::Build' => 0.28,
