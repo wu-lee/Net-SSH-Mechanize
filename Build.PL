@@ -26,6 +26,10 @@ my $builder = Module::Build->new
      dist_abstract       => 'Asynchronous ssh command invocation',
      create_readme       => 1,
      create_makefile_pl  => 'traditional',
+     configure_requires => 
+     {
+         'Module::Build' => 0.28,
+     },
      build_requires => 
      {
          'Module::Build' => 0.28,
