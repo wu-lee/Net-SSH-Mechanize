@@ -60,7 +60,7 @@ An example command file:
 
 An example showing what you might get invoking:
 
-    ./gofer git-status.sh
+    cat hosts | gofer git-status.sh
 
 With C<git-status.sh> containing:
 
@@ -68,7 +68,7 @@ With C<git-status.sh> containing:
 
    sudo cd /root/configuration; git status
 
-And a C<.gofer.conf> containing:
+And a C<hosts> containing:
 
     alpha    @alpha
     beta     @beta
@@ -114,7 +114,7 @@ use lib "$Bin/../local-lib/lib/perl5", "$Bin/../local-lib/lib/perl5/i486-linux-g
     "$Bin/../lib";
 
 use Net::SSH::Mechanize::Multi;
-#use Net::SSH::Mechanize::Parse qw(parse_map);
+
 use Carp qw(croak);
 
 sub slurp {
@@ -177,37 +177,49 @@ sub parse_map {
     return @map;
 }
 
-my $config_path = first { -f } 
-    "$Bin/.gofer.conf", 
-    "$ENV{USER}/.gofer.conf",
-    "/etc/gofer.conf";
-
-
+my $commands;
+my $command_file;
+my $no_op;
 GetOptions(
-    "--config=s" => sub {
-        my (undef, $val) = @_;
-        die "no such file '$val'\n"
-            unless -f $val;
+    "--no-op" => \$no_op,
+    "--file=s" => sub {
+        # FIXME can this be called twice?
+        die "can't specify both --command and --file\n"
+            if $commands;
 
-        $config_path = $val;
+        (undef, $command_file) = @_;
+        die "no such file '$command_file'\n"
+            unless -f $command_file;
+
+        $commands = slurp $command_file;
     },
 )
     or die "failed to parse options, stopping\n";
 
-die "no config file found, stopping. please supply one with --config option.\n"
-    unless defined $config_path;
+if ($command_file && @ARGV) {
+    die "can't accept arguments if --file is given\n"
+}
+else {
+    $commands = join " ", @ARGV;
+}
 
-my %map = parse_map slurp $config_path;
+die "Please supply some commands\n"
+    unless $commands 
+        && $commands =~ /\S/;
 
 
-my $cmd_file = shift
-    or die "please supply a command file. stopping.\n";
+if ($no_op) {
+    # just print the command.
+    # FIXME print the hosts too?
+    print $commands;
+    exit 0;
+}
 
+my %map = parse_map <STDIN>;
 
 #use Data::Dumper; warn Dumper \%map; # DB
 my $manager = Net::SSH::Mechanize::Multi->new;
 $manager->add(%map);
-
 
 
 sub execute_script {
@@ -256,13 +268,11 @@ sub execute_script {
 }
 
 
-my $cmds = slurp $cmd_file;
-
 my $threads = $manager->in_parallel(keys %map => sub {
     my ($name, $ssh) = @_;
     my $start = time;
 
-    my $results = execute_script $ssh, $cmds;
+    my $results = execute_script $ssh, $commands;
 
     print "----[ $name ]", '-'x(64 - length $name), "\n";
     print @$results;
