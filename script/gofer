@@ -105,15 +105,13 @@ Then you might get output like the following:
 
 use strict;
 use warnings;
-use Getopt::Long qw(:config posix_default);
+use Getopt::Long qw(:config gnu_compat);
 use Carp qw(croak);
 use IO::File;
 use List::Util qw(first);
 use FindBin '$Bin';
 use lib "$Bin/../local-lib/lib/perl5", "$Bin/../local-lib/lib/perl5/i486-linux-gnu-thread-multi", 
     "$Bin/../lib";
-
-use Net::SSH::Mechanize::Multi;
 
 use Carp qw(croak);
 
@@ -124,6 +122,89 @@ sub slurp {
     local $/;
     return <$fh>;
 }
+
+
+# Prompt for a password, and read it directly from terminal (so that
+# we can also read from stdin).  This won't work on non-unix systems,
+# since they don't have /dev/tty.  I'm not sure what I should do
+# there, presumably use Win32::Console?
+# Adapted from
+# http://perldoc.perl.org/perlfaq5.html#How-can-I-read-a-single-character-from-a-file?--From-the-keyboard?
+# And http://www.perlmonks.org/?node_id=773803
+sub prompt {
+    my ($prompt) = @_;
+    my $phrase = '';
+
+    open my $tty, '<', '/dev/tty';
+    local $| = 1;
+    print $prompt;
+
+    Term::ReadKey::ReadMode('noecho', $tty);
+
+    while (1) {
+        my $c = Term::ReadKey::ReadKey(~0/2-1, $tty); 
+        # Windows workaround http://rt.cpan.org/Public/Bug/Display.html?id=27944
+
+        if ($c =~ /[\r\n]/) {
+            print "\n";
+            last;
+        }
+        elsif ($c eq "\b" || ord $c == 127) {
+            next unless length $phrase;
+            chop $phrase;
+        }
+        elsif (ord $c) {
+            $phrase .= $c;
+        }
+    }
+    Term::ReadKey::ReadMode('restore', $tty);
+    return $phrase;
+}
+
+
+# Stolen from Net::OpenSSH
+my $obfuscate = sub {
+    # just for the casual observer...
+    my $txt = shift;
+    $txt =~ s/(.)/chr(ord($1) ^ 47)/ges
+        if defined $txt;
+    $txt;
+};
+my $deobfuscate = $obfuscate;
+
+
+# Constructors for the various password broker functions
+my %password_brokers = (
+    # Just interprets the token as the password in plaintext.
+    # Maximally insecure.
+    plaintext => sub { 
+        return sub { shift },
+    },
+
+    # Interpret the token as a password obfuscated using $obfuscate
+    obfuscated => sub { $deobfuscate },
+
+    # Uses the token as a name to prompt the user for the *real* password.
+    prompt => sub {
+        require Term::ReadKey; # We must have this loaded.
+
+        # keep the passwords here
+        my %password_cache;
+
+        return sub {
+            my $token = shift;
+
+            if (defined $password_cache{$token}) {
+                return $password_cache{$token};
+            }
+
+            my $password = prompt "password for $token: ", echo => '*';
+
+            return $password_cache{$token} = $password;
+        };
+    },
+);
+
 
 =head2 parse_map @lines_or_strings
 
@@ -140,7 +221,10 @@ directly to C<<Net::SSH::Mechanize::Multi->add>>.
 
 sub parse_map {
     my @map;
-    my $obtain_password = shift;
+    my $password_broker = shift;
+    croak "first argument must be a coderef"
+        unless ref $password_broker eq 'CODE';
+
 
     foreach my $str (@_) {
         foreach (split '\n', $str) {
@@ -170,7 +254,13 @@ sub parse_map {
             # Remove undefined values
             !defined $params{$_} and delete $params{$_}
                 for keys %params;
-            
+
+            # Obtain the real password from our broker, if one exists.
+            # This allows us to perform whatever sort of prompting,
+            # look-up, or decryption we need, in a customisable way.
+            if (exists $params{password}) {
+                $params{password} = $password_broker->($params{password});
+            }
             
             push @map, $name, \%params;
         }
@@ -182,7 +272,9 @@ sub parse_map {
 
 my $commands;
 my $command_file;
+my @credentials;
 my $no_op;
+my $password_broker = 'prompt';
 GetOptions(
     "--no-op" => \$no_op,
     "--file=s" => sub {
@@ -196,6 +288,18 @@ GetOptions(
 
         $commands = slurp $command_file;
     },
+    "--password=s" => sub {
+        (undef, $password_broker) = @_;
+        die "No such password broker '$password_broker'\n"
+            unless $password_brokers{$password_broker};
+    },
+    "--credentials=s" => sub {
+        my (undef, $credentials_file) = @_;
+        die "no such file '$credentials_file'\n"
+            unless -f $credentials_file;
+
+        @credentials = slurp $credentials_file;
+    },
 )
     or die "failed to parse options, stopping\n";
 
@@ -206,21 +310,34 @@ else {
     $commands = join " ", @ARGV;
 }
 
+
+# Construct the password broker.  This should generate an error if
+# there is any problem.
+$password_broker = $password_brokers{$password_broker}->();
+
 die "Please supply some commands\n"
     unless $commands 
         && $commands =~ /\S/;
 
-
 if ($no_op) {
     # just print the command.
     # FIXME print the hosts too?
-    print $commands;
+    print "$commands\n";
     exit 0;
 }
 
-my %map = parse_map <STDIN>;
+# Get credentials from STDIN if none already read
+@credentials
+    or @credentials = <STDIN>;
 
-#use Data::Dumper; warn Dumper \%map; # DB
+# Parse them, get passwords if required
+my %map = parse_map $password_broker, @credentials;
+
+
+# This module uses Moose and is a bit slow to start; don't start it
+# unless we get this far.
+require Net::SSH::Mechanize::Multi;
+
 my $manager = Net::SSH::Mechanize::Multi->new;
 $manager->add(%map);
 
