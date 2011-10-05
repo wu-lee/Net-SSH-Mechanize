@@ -140,6 +140,8 @@ directly to C<<Net::SSH::Mechanize::Multi->add>>.
 
 sub parse_map {
     my @map;
+    my $obtain_password = shift;
+
     foreach my $str (@_) {
         foreach (split '\n', $str) {
             next if /^\s*#/;
@@ -165,9 +167,10 @@ sub parse_map {
                               $}x
                     or croak "invalid connection spec '$connection'\n";
 
-            
-            defined $params{$_} or delete $params{$_}
+            # Remove undefined values
+            !defined $params{$_} and delete $params{$_}
                 for keys %params;
+            
             
             push @map, $name, \%params;
         }
