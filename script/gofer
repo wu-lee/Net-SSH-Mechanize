@@ -247,7 +247,7 @@ sub deserialize {
 }
 
 
-=head2 parse_map @lines_or_strings
+=head2 parse_map %options
 
 Parses a sequence of lines of the following form:
 
@@ -261,13 +261,14 @@ directly to C<<Net::SSH::Mechanize::Multi->add>>.
 =cut
 
 sub parse_map {
-    my @map;
-    my $password_broker = shift;
-    die "first argument must be a coderef"
-        unless ref $password_broker eq 'CODE';
+    my %params = @_;
+    my $password_broker = $params{password_broker};
+    my $credentials = $params{credentials};
+    my $passwords_required = $params{passwords_required};
 
+    my @map;
     my $line_no = 0;
-    foreach my $str (@_) {
+    foreach my $str (@$credentials) {
         foreach (split '\n', $str) {
             ++$line_no;
             next if /^\s*#/;
@@ -282,14 +283,21 @@ sub parse_map {
                 die "error parsing credentials, on line #$line_no: $@\n";
             };
 
-            # Obtain the real password from our broker, if one exists.
-            # This allows us to perform whatever sort of prompting,
-            # look-up, or decryption we need, in a customisable way.
-            if (exists $attrs->{password}) {
-                $attrs->{password} = $password_broker->($attrs->{password});
+            my $authentication = $attrs->{authentication} || '';
+            if ($passwords_required || $authentication eq 'password') {
+                # Obtain the real password from our broker, if one exists.
+                # This allows us to perform whatever sort of prompting,
+                # look-up, or decryption we need, in a customisable way.
+
+                my $identifier = $attrs->{password} || $name;
+                $attrs->{password} = $password_broker->($identifier);
+            }
+            else {
+                # Remove password, to avoid distributing it unnecessarily
+                delete $attrs->{password};
             }
 
-            # A convenience
+            # A convenience.
             $attrs->{host} ||= $name;
             
             push @map, $name, $attrs;
@@ -418,8 +426,15 @@ if ($no_op) {
 @credentials
     or @credentials = <STDIN>;
 
-# Parse them, get passwords if required
-my %map = parse_map $password_broker, @credentials;
+# Compile the commands, find out if we need to prompt for passwords
+my ($script, $sudos) = compile_script $commands;
+
+# Parse the credentials, get passwords if required
+my %map = parse_map(
+    password_broker => $password_broker,
+    prompt_always => $sudos,
+    credentials => \@credentials,
+);
 
 
 # This module uses Moose and is a bit slow to start; don't start it
@@ -428,9 +443,6 @@ require Net::SSH::Mechanize::Multi;
 
 my $manager = Net::SSH::Mechanize::Multi->new;
 $manager->add(%map);
-
-
-my ($script, $sudos) = compile_script $commands;
 
 my $threads = $manager->in_parallel(keys %map => sub {
     my ($name, $ssh) = @_;
