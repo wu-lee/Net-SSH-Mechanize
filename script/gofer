@@ -106,7 +106,6 @@ Then you might get output like the following:
 use strict;
 use warnings;
 use Getopt::Long qw(:config gnu_compat);
-use Carp qw(croak);
 use IO::File;
 use List::Util qw(first);
 use FindBin '$Bin';
@@ -208,6 +207,46 @@ my %password_brokers = (
 );
 
 
+
+# Split a string created by serialise_line into a name and an
+# attribute-value list. Note, this function should *not* leak sensitive
+# information, yet alone include passwords in error messages!
+#
+# Adapted from Cluster::Facts to avoid a dependency.
+use Text::ParseWords qw(parse_line);
+sub deserialize {
+    my $line = shift;
+    my ($empty, $name, @values) = parse_line qr/\s*(=\s*|\s+)/, 0, $line;
+
+    # Perform some sanity checking
+    die "line does not start with '='\n"
+        if length $empty;
+
+    die "number of attribute values does not match number of keys"
+        if @values % 2;
+
+    # Count each key's frequency whilst converting to a hash
+    my %counts;
+    my %attrs = map {
+        $counts{$values[0]}++;
+        splice @values, 0 ,2;
+    } 1..@values/2;
+
+    # collect (quoted) names of duplicates
+    my @duplicates = map {
+        s/'/\\'/g; 
+        "'$_'";
+    } grep {
+        $counts{$_} > 1;
+    } keys %counts;
+    
+    die "duplicated keys\n"
+        if @duplicates;
+
+    return $name, \%attrs;
+}
+
+
 =head2 parse_map @lines_or_strings
 
 Parses a sequence of lines of the following form:
@@ -224,47 +263,36 @@ directly to C<<Net::SSH::Mechanize::Multi->add>>.
 sub parse_map {
     my @map;
     my $password_broker = shift;
-    croak "first argument must be a coderef"
+    die "first argument must be a coderef"
         unless ref $password_broker eq 'CODE';
 
-
+    my $line_no = 0;
     foreach my $str (@_) {
         foreach (split '\n', $str) {
+            ++$line_no;
             next if /^\s*#/;
             next if /^\s*$/;
-            chomp;
 
-            my ($name, $connection) = split ' ', $_, 2;
-
-            my %params;
-            @params{qw(user password host port)} = 
-                $connection =~ m{^
-                                 (?:
-                                     ([^\s:]+)?
-                                     (?:
-                                         : (\S+)
-                                     )?
-                                 )?
-                                 @
-                                 (\S+?)
-                                 (?:
-                                     : (\d+)
-                                 )?
-                              $}x
-                    or croak "invalid connection spec '$connection'\n";
-
-            # Remove undefined values
-            !defined $params{$_} and delete $params{$_}
-                for keys %params;
+            my ($name, $attrs) = eval {
+                deserialize $_;
+            }
+            or do {
+                # Note: deserialize should be written to not divulge anything
+                # specific, just a type of error.
+                die "error parsing credentials, on line #$line_no: $@\n";
+            };
 
             # Obtain the real password from our broker, if one exists.
             # This allows us to perform whatever sort of prompting,
             # look-up, or decryption we need, in a customisable way.
-            if (exists $params{password}) {
-                $params{password} = $password_broker->($params{password});
+            if (exists $attrs->{password}) {
+                $attrs->{password} = $password_broker->($attrs->{password});
             }
+
+            # A convenience
+            $attrs->{host} ||= $name;
             
-            push @map, $name, \%params;
+            push @map, $name, $attrs;
         }
     }
     
