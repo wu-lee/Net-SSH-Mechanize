@@ -115,6 +115,8 @@ use lib "$Bin/../local-lib/lib/perl5", "$Bin/../local-lib/lib/perl5/i486-linux-g
 
 use Carp qw(croak);
 
+######################################################################
+
 sub slurp {
     my ($file) = @_;
     my $fh = IO::File->new($file)
@@ -270,6 +272,64 @@ sub parse_map {
     return @map;
 }
 
+
+sub compile_script {
+    my $sudos = 0;
+    my @steps;
+
+    foreach my $str (@_) {
+        foreach (split '\n', $str) {
+            my $line = $_;
+            if (/^\s*#/ || /^\s*$/) {
+                push @steps, sub { "  $line\n" };
+                next;
+            }
+
+            chomp;
+            if (s/^\s*sudo\s*//) {
+                
+                push @steps, sub { qq(  \$ sudo "$line"\n) };
+
+                push @steps, sub { 
+                    my $result = shift->sudo_capture($line);
+                    return "$result\n"
+                        if $result;
+                };
+
+                $sudos++;
+            }
+            else {
+                push @steps, sub { qq(  \$ $line\n) };
+                push @steps, sub {
+                    my $result = shift->capture($line);
+
+                    return "$result\n"
+                        if $result;
+                };
+            }
+        }
+    }
+    my $compiled = sub {
+        my $ssh = shift;
+        my @results;
+        eval {
+            foreach my $step (@steps) {
+                push @results, $step->($ssh);
+            }
+            1;
+        }
+        or do {
+            push @results, "$@"; 
+        };
+        return \@results;
+    };
+
+    return ($compiled, $sudos);
+}
+
+
+######################################################################
+
 my $commands;
 my $command_file;
 my @credentials;
@@ -342,57 +402,13 @@ my $manager = Net::SSH::Mechanize::Multi->new;
 $manager->add(%map);
 
 
-sub execute_script {
-    my $ssh = shift;
-
-    my @results;
-    LOOP: foreach my $str (@_) {
-        foreach (split '\n', $str) {
-            if (/^\s*#/ || /^\s*$/) {
-                push @results, "  $_\n";
-                next;
-            }
-
-            chomp;
-            if (s/^\s*sudo\s*//) {
-                
-                push @results, qq(  \$ sudo "$_"\n);
-                eval {
-                    my $result = $ssh->sudo_capture($_);
-
-                    push @results, "$result\n"
-                        if $result;
-                    1;
-                } or do {
-                    push @results, my $err = $@;
-                    last LOOP;
-                }
-            }
-            else {
-                push @results, qq(  \$ $_\n);
-                eval {
-                    my $result = $ssh->capture($_);
-
-                    push @results, "$result\n"
-                        if $result;
-                    1;
-                } or do {
-                    push @results, my $err = $@;
-                    last LOOP;
-                }
-
-            }
-        }
-    }
-    return \@results;
-}
-
+my ($script, $sudos) = compile_script $commands;
 
 my $threads = $manager->in_parallel(keys %map => sub {
     my ($name, $ssh) = @_;
     my $start = time;
 
-    my $results = execute_script $ssh, $commands;
+    my $results = $script->($ssh);
 
     print "----[ $name ]", '-'x(64 - length $name), "\n";
     print @$results;
