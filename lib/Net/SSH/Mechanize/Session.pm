@@ -25,8 +25,6 @@ my $prompt_re = qr/\Q$prompt\E$/sm;
 my $sudo_passwd_prompt_re = qr/^$sudo_passwd_prompt$/;
 
 
-my $login_timeout_secs = 10;
-
 has 'connection_params' => (
     isa => 'Net::SSH::Mechanize::ConnectParams',
     is => 'rw',
@@ -41,6 +39,12 @@ has '_error_event' => (
 );
 
 
+# The log-in timeout limit in seconds
+has 'login_timeout' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 30,
+);
 
 # helper function
 
@@ -135,12 +139,13 @@ sub login_async {
     });
 
     my $timeout;
+    my $delay = $self->login_timeout;
     $timeout = AnyEvent->timer(
-        after => $login_timeout_secs, 
+        after => $delay, 
         cb    => sub { 
             undef $timeout;
 #            print "timing out login\n"; # DB
-            $done->croak("login timed out after $login_timeout_secs seconds");
+            $done->croak("login timed out after $delay seconds");
         },
     );
 
@@ -290,12 +295,13 @@ sub sudo_capture_async {
     my $stderr = $self->delegate('stderr')->handle;
 
     my $timeout;
+    my $delay = $self->login_timeout;
     $timeout = AnyEvent->timer(
-        after => $login_timeout_secs, 
+        after => $delay, 
         cb    => sub { 
             undef $timeout;
 #            print "timing out login\n"; # DB
-            $done->croak("sudo_capture timed out after $login_timeout_secs seconds");
+            $done->croak("sudo_capture timed out after $delay seconds");
         },
     );
 

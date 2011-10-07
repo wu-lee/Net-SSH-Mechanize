@@ -41,6 +41,13 @@ has 'session' => (
     handles => [qw(capture capture_async sudo_capture sudo_capture_async logout)],
 );
 
+# The log-in timeout limit in seconds
+has 'login_timeout' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 30,
+);
+
 
 around 'BUILDARGS' => sub {
     my $orig = shift;
@@ -124,6 +131,9 @@ sub login_async {
     # can't add it to the constructor above because of the design of
     # AnyEvent::Subprocess.
     $session->connection_params($self->connection_params);
+
+    # And set the login_timeout
+    $session->login_timeout($self->login_timeout);
 
     # turn off terminal echo
     $session->delegate('pty')->handle->fh->set_raw;

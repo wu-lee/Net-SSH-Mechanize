@@ -10,6 +10,7 @@ use Net::SSH::Mechanize;
 use MyTest::Mock::ConnectParams;
 
 my $threads = 10;
+my $timeout = 10;
 
 my @exchanges = (
     [q(id),
@@ -23,7 +24,10 @@ my @exchanges = (
 plan tests => @exchanges * $threads + 2;
 
 my (@ssh) = map { 
-    Net::SSH::Mechanize->new(connection_params => MyTest::Mock::ConnectParams->detect);
+    Net::SSH::Mechanize->new(
+        connection_params => MyTest::Mock::ConnectParams->detect,
+        login_timeout => $timeout,
+    );
 } 1..$threads;
 
 is @ssh, $threads, "number of subprocesses is $threads";
@@ -39,6 +43,7 @@ foreach my $ix (1..@ssh) {
         eval {
             my $session = $ssh->login;
             note "(thread=$ix) logged in";  
+
             foreach my $exchange (@exchanges) {
                 my ($cmd, $expect) = @$exchange;
                 

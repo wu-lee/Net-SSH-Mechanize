@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 use strict;
 use warnings;
-use Test::More tests => 3;
+use Test::More tests => 4;
 use FindBin qw($Bin);
 use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib", "$Bin/lib";
 
@@ -13,11 +13,15 @@ my $connection = MyTest::Mock::ConnectParams->detect;
 note "using command:";
 note "    ", join " ", $connection->ssh_cmd;
 
+my $timeout = 10;
 my $ssh = Net::SSH::Mechanize->new(
     connection_params => $connection,
+    login_timeout => $timeout,
 );
 
 my $session = $ssh->login;
+
+is $session->login_timeout, $timeout, "timeout set ok";
 
 my @exchanges = (
     [q(id),
