@@ -430,7 +430,7 @@ my ($script, $sudos) = compile_script $commands;
 # Parse the credentials, get passwords if required
 my %map = parse_map(
     password_broker => $password_broker,
-    prompt_always => $sudos,
+    passwords_required => $sudos,
     credentials => \@credentials,
 );
 
