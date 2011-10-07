@@ -375,10 +375,6 @@ my $login_timeout;
 GetOptions(
     "--no-op|n" => \$no_op,
     "--file|f=s" => sub {
-        # FIXME can this be called twice?
-        die "can't specify both --command and --file\n"
-            if $commands;
-
         (undef, $command_file) = @_;
         die "no such file '$command_file'\n"
             unless -f $command_file;
