@@ -108,6 +108,7 @@ use warnings;
 use Getopt::Long qw(:config gnu_compat);
 use IO::File;
 use List::Util qw(first);
+use Text::ParseWords qw(parse_line);
 use FindBin '$Bin';
 use lib "$Bin/../local-lib/lib/perl5", "$Bin/../local-lib/lib/perl5/i486-linux-gnu-thread-multi", 
     "$Bin/../lib";
@@ -213,7 +214,6 @@ my %password_brokers = (
 # information, yet alone include passwords in error messages!
 #
 # Adapted from Cluster::Facts to avoid a dependency.
-use Text::ParseWords qw(parse_line);
 sub deserialize {
     my $line = shift;
     my ($empty, $name, @values) = parse_line qr/\s*(=\s*|\s+)/, 0, $line;
