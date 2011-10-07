@@ -57,6 +57,9 @@ my $builder = Module::Build->new
      {
          'Test::Pod' => 1.14,
          'Test::Pod::Coverage' => 1.04,
+         
+         # If you want gofer to be able to prompt for passwords:
+         'Term::ReadKey' => 0,
      },
      test_files         => [ rscan_dir('t', '\.t$'),
                              rscan_dir('xt', '\.t$') ],
