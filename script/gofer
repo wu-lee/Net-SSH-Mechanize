@@ -373,8 +373,8 @@ my $no_op;
 my $password_broker = 'prompt';
 my $login_timeout;
 GetOptions(
-    "--no-op" => \$no_op,
-    "--file=s" => sub {
+    "--no-op|n" => \$no_op,
+    "--file|f=s" => sub {
         # FIXME can this be called twice?
         die "can't specify both --command and --file\n"
             if $commands;
@@ -385,19 +385,19 @@ GetOptions(
 
         $commands = slurp $command_file;
     },
-    "--password=s" => sub {
+    "--password|p=s" => sub {
         (undef, $password_broker) = @_;
         die "No such password broker '$password_broker'\n"
             unless $password_brokers{$password_broker};
     },
-    "--credentials=s" => sub {
+    "--credential|cs=s" => sub {
         my (undef, $credentials_file) = @_;
         die "no such file '$credentials_file'\n"
             unless -f $credentials_file;
 
         @credentials = slurp $credentials_file;
     },
-    "--login-timeout=i" => \$login_timeout,
+    "--login-timeout|t=i" => \$login_timeout,
 )
     or die "failed to parse options, stopping\n";
 
