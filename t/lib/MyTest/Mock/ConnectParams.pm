@@ -9,10 +9,13 @@ sub detect {
 
     return $class->new(host => 'nowhere',
                        password => 'sekrit')
-        unless $ENV{TEST_PASSWD};
+        unless $ENV{TEST_PASSWD} || $ENV{TEST_HOST};
 
-    return Net::SSH::Mechanize::ConnectParams->new(host => $ENV{TEST_HOST} || 'localhost',
-                                                   password => $ENV{TEST_PASSWD});
+    return Net::SSH::Mechanize::ConnectParams->new(
+        host => $ENV{TEST_HOST} || 'localhost',
+        $ENV{TEST_PASSWD}? 
+            (password => $ENV{TEST_PASSWD}) : (),
+    );
 }
 
 sub ssh_cmd {
