@@ -20,16 +20,25 @@ has 'names' => (
     default => sub { +{} },
 );
 
+has 'constructor_defaults' => (
+    isa => 'HashRef',
+    is => 'rw',
+    default => sub { +{} },
+);
+
 ######################################################################
 
 sub _to_ssh {
+    my $self = shift;
     my @instances;
+    my $defaults = $self->constructor_defaults;
+
     while(@_) {
         my ($name, $connection) = splice @_, 0, 2;
-        $connection = Net::SSH::Mechanize::ConnectParams->new(%$connection)
+        $connection = Net::SSH::Mechanize->new(%$defaults, %$connection)
             if ref $connection eq 'HASH';
 
-        $connection = Net::SSH::Mechanize->new(connection_params => $connection)
+        $connection = Net::SSH::Mechanize->new(%$defaults, connection_params => $connection)
             if blessed $connection 
                 && $connection->isa('Net::SSH::Mechanize::ConnectParams');
         
@@ -59,7 +68,7 @@ sub add {
     croak "These names are already defined: @defined"
         if @defined;
 
-    my @new_instances = _to_ssh %new_instances;
+    my @new_instances = $self->_to_ssh(%new_instances);
     
     my $instances = $self->ssh_instances;
 

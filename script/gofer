@@ -371,6 +371,7 @@ my $command_file;
 my @credentials;
 my $no_op;
 my $password_broker = 'prompt';
+my $login_timeout;
 GetOptions(
     "--no-op" => \$no_op,
     "--file=s" => sub {
@@ -396,6 +397,7 @@ GetOptions(
 
         @credentials = slurp $credentials_file;
     },
+    "--login-timeout=i" => \$login_timeout,
 )
     or die "failed to parse options, stopping\n";
 
@@ -442,6 +444,10 @@ my %map = parse_map(
 require Net::SSH::Mechanize::Multi;
 
 my $manager = Net::SSH::Mechanize::Multi->new;
+
+$manager->constructor_defaults->{login_timeout} = 0+$login_timeout
+    if defined $login_timeout;
+
 $manager->add(%map);
 
 my $threads = $manager->in_parallel(keys %map => sub {
