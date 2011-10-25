@@ -314,15 +314,14 @@ sub compile_script {
     my @steps;
 
     foreach my $str (@_) {
-        foreach (split '\n', $str) {
-            my $line = $_;
-            if (/^\s*#/ || /^\s*$/) {
+        foreach my $line (split '\n', $str) {
+            if ($line =~ /^\s*#/ || $line =~ /^\s*$/) {
                 push @steps, sub { "  $line\n" };
                 next;
             }
 
-            chomp;
-            if (s/^\s*sudo\s*//) {
+            chomp $line;
+            if ($line =~ s/^\s*sudo\s*//) {
                 
                 push @steps, sub { qq(  \$ sudo "$line"\n) };
 
@@ -345,6 +344,7 @@ sub compile_script {
             }
         }
     }
+
     my $compiled = sub {
         my $ssh = shift;
         my @results;
