@@ -450,6 +450,7 @@ my $threads = $manager->in_parallel(keys %map => sub {
     my ($name, $ssh) = @_;
     my $start = time;
 
+    $ssh->login;
     my $results = $script->($ssh);
 
     print "----[ $name ]", '-'x(64 - length $name), "\n";
