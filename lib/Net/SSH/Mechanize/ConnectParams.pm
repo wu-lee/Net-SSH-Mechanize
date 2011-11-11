@@ -24,19 +24,6 @@ has 'port' => (
     default => 22,
 );
 
-# has 'cmd' => (
-#     isa => 'Str',
-#     is => 'rw',
-#     default => 'sh',
-# );
-
-# has 'has_pty' => (
-#     isa => 'Bool',
-#     is => 'rw',
-#     default => 0,
-# );
-
-
 sub ssh_cmd {
     my $self = shift;
 
@@ -58,16 +45,77 @@ __END__
 
 Net::SSH::Mechanize::ConnectParams - encapsulates information about an ssh connection
 
-=head1 VERSION
-
-This document describes Net::SSH::Mechanize version 0.1
-
 =head1 SYNOPSIS
 
 This class is just a container for log-in details with a method which
 constructs an approprate C<ssh> command invocation.
 
-This documentation is unfinished.
+This equates to C</usr/bin/ssh -t somewhere.com sh>:
+
+    my $minimal_params = Net::SSH::Mechanize::ConnectParams->new(
+        host => 'somewhere.com',
+    );
+
+This equates to C</usr/bin/ssh -l someone -p 999 -t somewhere.com sh>:
+
+    my $all_params = Net::SSH::Mechanize::ConnectParams->new(
+        host => 'somewhere.com',
+        user => 'someone',
+        port => 999,
+        password => 'secret',
+    );
+
+=head1 CLASS METHODS
+
+=head2 C<< $obj = $class->new(%parameters) >>
+
+Creates a new instance.  Parameters is a hash or a list of key-value
+parameters.  Valid parameter keys are:
+
+=over 4
+
+=item C<host>
+
+The hostname to connect to (a scalar string).  Either this or C<connection_params> must
+be supplied.
+
+=item C<user>
+
+The name of the user account to log into (a scalar string).  If not
+given, no user will be supplied to C<ssh> (this typically means it
+will use the current user as default).
+
+=item C<port>
+
+The port to connect to (a positive scalar integer; C<ssh> will default
+to 22 if this is not specificed).
+
+=item C<password>
+
+The password to connect with (a scalar string).  This is only required
+if authentication will be performed, either on log-in or when sudoing.
+
+=back
+
+=head1 INSTANCE ATTRIBUTES
+
+=head2 C<< $obj->host >>
+=head2 C<< $obj->user >>
+=head2 C<< $obj->password >>
+=head2 C<< $obj->port >>
+
+These are all read-write accessors for the attribute parameters
+accepted by the constructor.
+
+=head1 INSTANCE METHODS
+
+=head2 C<< $cmd = $obj->ssh_cmd >>
+
+This constructs the C<ssh> command to invoke.  If you need something
+different, you can create a subclass which overrides this method, and
+pass that via the C<connection_params> parameter to
+C<< Net::SSH::Mechanize->new() >>.
+
 
 =head1 AUTHOR
 
@@ -81,26 +129,3 @@ Copyright (c) 2011, Nick Stokoe C<< <npw@cpan.org> >>. All rights reserved.
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.
 
-
-=head1 DISCLAIMER OF WARRANTY
-
-BECAUSE THIS SOFTWARE IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
-FOR THE SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN
-OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
-PROVIDE THE SOFTWARE "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
-EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
-ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE SOFTWARE IS WITH
-YOU. SHOULD THE SOFTWARE PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL
-NECESSARY SERVICING, REPAIR, OR CORRECTION.
-
-IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
-WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
-REDISTRIBUTE THE SOFTWARE AS PERMITTED BY THE ABOVE LICENCE, BE
-LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL,
-OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE
-THE SOFTWARE (INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR DATA BEING
-RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A
-FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE), EVEN IF
-SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGES.

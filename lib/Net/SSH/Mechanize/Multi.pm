@@ -123,16 +123,182 @@ __END__
 
 Net::SSH::Mechanize::Multi - parallel ssh invocation 
 
-=head1 VERSION
-
-This document describes Net::SSH::Mechanize version 0.1
-
 =head1 SYNOPSIS
 
-Currently, the best example of this module's usage is in the gofer
-script included in this distribution.
+    my $manager = Net::SSH::Mechanize::Multi->new(
 
-This documentation is unfinished.
+        # Set the default parameters for the Net::SSH::Mechanize
+        # instances we will create
+        constructor_defaults => { login_timeout => 180 },
+
+    );
+
+    # Add connection definitions as a list of connection-name to
+    # Net::SSH::Mechanize instance pairs (or shorthand equivalents, as
+    # illustrated).
+    $manager->add(
+
+        # This defines the connection using a
+        # Net::SSH::Mechanize::ConnectParams instance (or subclass
+        # thereof)
+        connection1 => Net::SSH::Mechanize::ConnectParams->new(
+            hostname => 'host1.com',
+        ),
+
+        # This defines it using a hashref of constructor parameters
+        # for Net::SSH::Mechanize
+        connection2 => {
+            user => 'joe',
+            hostname => 'host1.com',
+            login_timeout => 60,
+        },
+        
+        # This passes a Net::SSH::Mechanize instance directly
+        connection3 => Net::SSH::Mechanize->new(
+            user => 'joe',
+            hostname => 'host2.com',
+            login_timeout => 60,
+        ),
+
+        # ...        
+    );
+
+    # At this point no hosts have been contacted.
+
+    # Connect to a named subset of them all in parallel like this.
+    # The callback should expect the name and the appropriate
+    # Net::SSH::Mechanize instance as arguments.
+    # Synchronous commands in the callback work asyncronously 
+    # thanks to Coro::AnyEvent.
+    my @names = qw(host1 host2);
+    my $threads = $manager->in_parallel(@names => sub {
+        my ($name, $ssh) = @_;
+
+        printf "About to connect to %s using;\n'$s'\n\n",
+            $name, $ssh->connection_params->ssh_cmd
+
+        # note, the login is done implicitly when you access the
+        # ->session parameter, or a method which delegates to it.
+
+        # do stuff... 
+        print "checking git status of config definition:\n";
+        print $ssh->sudo_capture("cd /root/config; git status");
+        
+        # ...
+    });
+
+    # Wait for them all to complete.
+    $_->join for @$threads;
+
+    print "done\n";
+
+
+There is a full implementation of this kind of usage is in the
+C<gofer> script included in this distribution.
+
+=head1  CLASS METHODS
+
+=head2 C<< $obj = $class->new(%params) >>
+
+Creates a new instance.  Parameters is a hash or a list of key-value
+parameters.  Valid parameter keys are:
+
+=over 4
+
+=item C<constructor_defaults>
+
+This is an optional parameter which can be used to define a hashref of
+default parameters to pass to C<Net::SSH::Mechanize> instances created
+by this class.  These defaults can be overridden in individual cases.
+
+=back 
+
+Currently it is also possible to pass parameters to initialise the
+C<names> and C<ssh_instances> attributes, but since the content of
+those are intended to be correlated this is definitely not
+recommended.  Use C<< ->add >> instead.
+
+=head1 INSTANCE ATTRIBUTES
+
+=head2 C<< $hashref = $obj->constructor_defaults >>
+=head2 C<< $obj->constructor_defaults(\%hashref) >>
+
+This is an read-write accessor which allows you to specify the default
+parameters to pass to the C<Net::SSH::Mechanize> constructor. These
+defaults can be overridden in individual cases.
+
+=head2 C<< $hashref = $obj->names >>
+
+This is a hashref of connection names mapped to C<Net::SSH::Mechanize>
+instances.  It is not recommend you change this directly, use the 
+C<< ->add >> method instead.
+
+=head2 C<< $hashref = $obj->ssh_instances >>
+
+This is an arrayref listing C<Net::SSH::Mechanize> instances we have
+created, in the order they have been defined via C<< ->add >> (which
+is also the order they will be iterated over within C<< ->in_parallel >>).
+
+=head1 INSTANCE METHODS
+
+=head2 C<< @mech_instances = $obj->add(%connections) >>
+
+Adds one or more named connection definitions.
+
+C<%connections> is a hash or list of name-value pairs defining what to
+connect to. The order in which they are defined here is preserved and
+used when iterating over them in C<< ->in_parallel >>.
+
+The names are simple string aliases, and can be anything unique (to
+this instance).  If a duplicate is encountered, an exception will be
+thrown.
+
+The values can be: 
+
+=over 4
+
+=item B<<A C<Net::SSH::Mechanize> instance>>
+
+The instance will be used as given to connect to a host.
+
+=item B<<A C<Net::SSH::Mechanize::ConnectParams>> instance>>
+
+The instance will be used to create a C<Net::SSH::Mechanize> instance to use.
+
+=item B<A hashref of constructor paramters for C<Net::SSH::Mechanize> >>
+
+The hashref will be passed to C<< Net::SSH::Mechanize->new >> to get an instance to use.
+
+=back
+
+A list of the C<Net::SSH::Mechanize> instances are returned, in the
+order they were defined.
+
+This method can be called any number of times, so long as the
+connection names are never duplicated.
+
+
+=head2 C<< @threads = $obj->in_parallel(@names, \&actions) >>
+
+This method accepts a list of host-names, and a callback.  The callback
+should expect two parameters: a connection name, and a
+C<Net::SSH::Mechanize> instance.
+
+It first checks that all the names have been defined in an earlier 
+C<< ->add >> invocation.  If any are unknown, an exception is thrown.
+
+Otherwise, it iterates over the names in the order given, and invokes
+the callback with the name and the appropriate C<Net::SSH::Mechanize>
+instance.
+
+Note: the callback is invoked each time as a I<co-routine>. See
+L<Coro> and L<Coro::AnyEvent> for more information about this, but it
+essentially means that each one is asynchronously run in parallel.
+This method returns a list of C<Coro> threads, immediately, before the
+callbacks have completed.
+
+Your program is then free to do other things, and/or call C<< ->join >>
+on each of the threads to wait for their termination.
 
 =head1 AUTHOR
 
@@ -147,25 +313,3 @@ This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.
 
 
-=head1 DISCLAIMER OF WARRANTY
-
-BECAUSE THIS SOFTWARE IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
-FOR THE SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN
-OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
-PROVIDE THE SOFTWARE "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
-EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
-ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE SOFTWARE IS WITH
-YOU. SHOULD THE SOFTWARE PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL
-NECESSARY SERVICING, REPAIR, OR CORRECTION.
-
-IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
-WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
-REDISTRIBUTE THE SOFTWARE AS PERMITTED BY THE ABOVE LICENCE, BE
-LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL,
-OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE
-THE SOFTWARE (INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR DATA BEING
-RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A
-FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE), EVEN IF
-SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGES.

@@ -23,7 +23,7 @@ use version; our $VERSION = qv('0.1');
 
 my @connection_params = qw(host user port password);
 
-
+# An object which defines a connection.
 has 'connection_params' => (
     isa => 'Net::SSH::Mechanize::ConnectParams',
     is => 'ro',
@@ -49,6 +49,9 @@ has 'login_timeout' => (
 );
 
 
+# This wrapper exists to map @connection_params into a
+# Net::SSH::Mechanize::ConnectParams instance, if one is not supplied
+# explicitly.
 around 'BUILDARGS' => sub {
     my $orig = shift;
     my $self = shift;
@@ -160,12 +163,13 @@ Net::SSH::Mechanize - asynchronous ssh command invocation
 
 =head1 VERSION
 
-This document describes Net::SSH::Mechanize version 0.1
+This document describes C<Net::SSH::Mechanize> version 0.1
 
 
 =head1 SYNOPSIS
 
-Somewhat like POE::Component::OpenSSH, SSH::Batch, Net::OpenSSH::Parallel etc, but:
+Somewhat like C<POE::Component::OpenSSH>, C<SSH::Batch>,
+C<Net::OpenSSH::Parallel>, C<App::MrShell> etc, but:
 
 =over 4
 
@@ -194,7 +198,8 @@ Synchronous usage:
         port => 22,
     );
 
-    # Accessing ->capture calls ->login automatically.
+    my $ssh->login;
+
     my $output = $ssh->capture("id");
 
     # If successful, $output now contains something like:
@@ -207,10 +212,14 @@ Synchronous usage:
 
     $ssh->logout;
 
-See below for further examples, and script/gofer in the distribution
-source for a working, hopefully usable example.
+As you can see, C<Net::SSH::Mechanize> instance connects to only
+I<one> host. L<Net::SSH::Mechanize::Multi|Net::SSH::Mechanize::Multi>
+manages connections to many.
 
-This is work in progress.  Feedback appreciated.
+See below for further examples, and C<script/gofer> in the
+distribution source for a working, usable example.
+
+This is work in progress.  Expect rough edges.  Feedback appreciated.
 
   
 =head1 DESCRIPTION
@@ -265,12 +274,138 @@ the scenes.
     $ssh->logout;
 
 You would only need to use this asynchronous style if you wanted to
-interface with AnyEvent, and/or add some C<Expect>-like interaction
+interface with C<AnyEvent>, and/or add some C<Expect>-like interaction
 into the code.
 
-However, see also L<Net::SSH::Mechanize::Multi> for a more convenient
+However, see also C<Net::SSH::Mechanize::Multi> for a more convenient
 way of running multiple ssh sessions in parallel.  It uses Coro to
 provide a (cooperatively) threaded model.
+
+=head2 gofer
+
+The C<script/> sub-directory includes a command-line tool called
+C<gofer> which is designed to accept a list of connection definitions,
+and execute shell commands supplied in the arguments in parallel on
+each.  See the documentation in the script for more information.
+
+
+=head1 JUSTIFICATION
+
+The problem with all other SSH wrappers I've tried so far is that they
+do not cope well when you need to sudo.  Some of them do it but
+unreliably (C<SSH::Batch>), others allow it with some help, but then
+don't assist with parallel connections to many servers (C<Net::OpenSSH>).
+The I tried C<POE::Component::OpenSSH>, but I found the
+C<POE::Component::Generic> implementation forced a painful programming
+style with long chains of functions, one for each step in an exchange
+with the ssh process.
+
+Possibly I just didn't try them all, or hard enough, but I really
+needed something which could do the job, and fell back to re-inventing
+the wheel.  Initial experiments with C<AnyEvent> and C<AnyEvent::Subprocess>
+showed a lot of promise, and the result is this.
+
+=head1 CLASS METHODS
+
+=head2 C<< $obj = $class->new(%params) >>
+
+Creates a new instance.  Parameters is a hash or a list of key-value
+parameters.  Valid parameter keys are:
+
+=over 4
+
+=item C<connection_params>
+
+A L<Net::SSH::Mechanize::ConnectParams> instance, which defines a host
+connection.  If this is given, any individual connection parameters
+also supplied to the constructor (C<host>, C<user>, C<port> or
+C<password>), will be ignored.
+
+If this is absent, a C<Net::SSH::Mechanize::ConnectParams> instance is
+constructed from any other individual connection parameters - the
+minimum which must be supplied is C<hostname>.  See below.
+
+=item C<host>
+
+The hostname to connect to.  Either this or C<connection_params> must
+be supplied.
+
+=item C<user>
+
+The user account to log into.  If not given, no user will be supplied
+to C<ssh> (this typically means it will use the current user as
+default).
+
+=item C<port>
+
+The port to connect to (C<ssh> will default to 22 if this is not
+specificed).
+
+=item C<password>
+
+The password to connect with.  This is only required if authentication
+will be performed, either on log-in or when sudoing.
+
+=item C<login_timeout>
+
+How long to wait before breaking a connection (in seconds). It is
+passed to C<AnyEvent->timer> handler, whose callback will terminate
+the session if the period is exceeded. This avoids hung connections
+when the remote end isn't answering, or isn't answering in a way that
+will allow C<Net::SSH::Mechanize> to terminate.
+
+The default is 30.
+
+=back
+
+
+=head1 INSTANCE ATTRIBUTES
+
+=head2 C<< $params = $obj->connection_params >>
+
+This is a read-only accessor for the C<connection_params> instance
+passed to the constructor (or equivalently, constructed from the
+constructor parameters).
+
+=head2 C<< $session = $obj->session >>
+
+This is read-only accessor to a lazily-instantiated
+C<Net::SSH::Mechanize::Session> instance, which represents the C<ssh>
+process.  Accessing it causes the session to be created and the remote
+host to be logged into.
+
+=head2 C<< $obj->login_timeout($integer) >>
+=head2 C<< $integer = $obj->login_timeout >>
+
+This is a read-write accessor to the log-in timeout parameter passed
+to the constructor.
+
+It is passed to C<Net::SSH::Mechanize::Session>'s constructor, so if
+you plan to modify it, do so before C<< ->session >> has been
+instantiated or will not have any effect on anything thereafter.
+
+=head1 INSTANCE METHODS
+
+=head2 C<login>
+=head2 C<login_async>
+=head2 C<capture>
+=head2 C<capture_async>
+=head2 C<sudo_capture>
+=head2 C<sudo_capture_async>
+=head2 C<logout>
+
+These methods exist here for convenience; they delegate to the
+equivalent C<Net::SSH::Mechanize::Session> methods.
+
+=head1 SEE ALSO
+
+There are a lot of related tools, and this is just in Perl.  Probably
+the most similar are C<SSH::Batch>, C<POE::Component::OpenSSH>, and
+C<App::MrShell> (which at the time of writing, I've not yet tried.)  None
+use C<AnyEvent>, so far as I can tell.
+
+L<SSH::Batch>, L<Net::OpenSSH>, L<Net::OpenSSH::Parallel>, L<Net::SSH>, L<Net::SSH2>,L<
+Net::SSH::Expect>, L<Net::SSH::Perl>, L<POE::Component::OpenSSH>, L<App::MrShell>.
 
 =head1 AUTHOR
 

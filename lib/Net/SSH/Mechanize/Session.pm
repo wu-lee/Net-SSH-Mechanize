@@ -441,16 +441,104 @@ __END__
 
 Net::SSH::Mechanize::Session - manage a running ssh process.
 
-=head1 VERSION
-
-This document describes Net::SSH::Mechanize version 0.1
-
 =head1 SYNOPSIS
 
-This is a subclass of AnyEvent::Subprocess::Running, with methods to
-manage the authentication and other interaction with the subprocess.
+This class represents a sunning C<ssh> process. It is a subclass of
+C<AnyEvent::Subprocess::Running>, with methods to manage the
+authentication and other interaction with the sub-process.
 
-This documentation is unfinished.
+Typically you will not create one directly, but obtain one via 
+C<< Net::SSH::Mechanize::Session->login >>, 
+or C<< Net::SSH::Mechanize->session >>
+
+You might invoke methods directly, or via C<Net::SSH::Mechanize>
+instance's methods which delegate to the instance's C<session>
+attribute (which is an instance of this class).
+
+   use Net::SSH::Mechanize;
+
+   my $mech = Net::SSH::Mechanize->new(hostname => 'somewhere');
+
+   my $session = $mech->session;
+   # ...
+
+=head1 CLASS METHODS
+
+=head2 C<< $obj = $class->new(%params) >>
+
+Creates a new instance.  Not intended for public use.  Use 
+C<< Net::SSH::Mechanize->session >> instead.
+
+=head1 INSTANCE ATTRIBUTES
+
+=head2 C<< $params = $obj->connection_params >>
+
+This is a read-only accessor for the C<connection_params> instance
+passed to the constructor by C<Net::SSH::Mechanize>.
+
+=head2 C<< $obj->login_timeout($integer) >>
+=head2 C<< $integer = $obj->login_timeout >>
+
+This is a read-write accessor to the log-in timeout parameter passed
+to the constructor.
+
+If you plan to modify it, do so before C<< ->login >> or 
+C<< ->login_async >> has been invoked or it will not have any effect
+on anything.
+
+=head1 INSTANCE METHODS
+
+Note, all of these will throw an exception if used before C<< ->login >>
+ or before C<< ->login_async >> has successfully completed, except
+of course C<< ->login >> and C<< ->login_async >> themselves.  
+These latter methods do nothing after the first invocation.
+
+=head2 C<< $session = $obj->login >>
+
+This method logs into the remote host using the defined connection
+parameters, and returns a C<Net::SSH::Mechanize::Session> instance on
+success, or throws an exception on failure.
+
+It is safe to use in C<AnyEvent> applications or C<Coro> co-routines,
+because the implementation is asynchronous and will not block the
+whole process.
+
+=head2 C<< $condvar = $obj->login_async >>
+
+This is an asynchronous method used to implement the synchronous 
+C<< ->login >> method.  It returns an AnyEvent::CondVar instance 
+immediately, which can be used to wait for completion, or register a
+callback to be notified when the log-in has completed.
+
+=head2 C<< $obj->logout >>
+
+Logs out of the remote host by issuing an "exit" command.
+
+=head2 C<< $condvar = $obj->capture_async($command) >>
+
+The returns a condvar immediately, which can be used to wait for
+successful completion (or otherwise) of the command(s) defined by
+C<$command>.
+
+=head2 C<< $result = $obj->capture($command) >>
+
+This invokes the command(s) defined by C<$command> on the remote host,
+and returns the result.
+
+=head2 C<< $condvar = $obj->sudo_capture_async($command) >>
+
+The returns a condvar immediately, which can be used to wait for
+successful completion (or otherwise) in a sudo'ed sub-shell of the
+command(s) defined by C<$command>.
+
+A password is required in C<connection_params> for this to
+authenticate with sudo.
+
+=head2 C<< $result = $obj->sudo_capture($command) >>
+
+This invokes the command(s) defined by C<$command> in a sudo'ed sub-shell
+on the remote host, and returns the result.
+
 
 =head1 AUTHOR
 
@@ -464,26 +552,3 @@ Copyright (c) 2011, Nick Stokoe C<< <npw@cpan.org> >>. All rights reserved.
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.
 
-
-=head1 DISCLAIMER OF WARRANTY
-
-BECAUSE THIS SOFTWARE IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
-FOR THE SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN
-OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
-PROVIDE THE SOFTWARE "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
-EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
-ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE SOFTWARE IS WITH
-YOU. SHOULD THE SOFTWARE PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL
-NECESSARY SERVICING, REPAIR, OR CORRECTION.
-
-IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
-WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
-REDISTRIBUTE THE SOFTWARE AS PERMITTED BY THE ABOVE LICENCE, BE
-LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL,
-OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE
-THE SOFTWARE (INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR DATA BEING
-RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A
-FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE), EVEN IF
-SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGES.
