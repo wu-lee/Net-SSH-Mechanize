@@ -6,16 +6,38 @@ gofer - execute multiple ssh sessions in parallel
 
 =head1 SYNOPSIS
 
-    # This uses the file hosts.conf to define thie configuration,
-    # and then reads and executes the commands in cmdfile on each host.
-    gofer --config hosts.conf  cmdfile.
+    # This expects a list of host connection definitions on STDIN, 
+    # then executes the command or command defined in the arguments 
+    # on each:
+    cat connections | gofer <commands>
 
-    # This checks for .gofer.conf, $USER/.gofer.conf or
-    # /etc/gofer.conf, and uses the first one available to define the
-    # ssh connections, and then executes the commands defied in
-    # cmdfile on each host.  If this or the connections config is not
-    # found, it will exit with an error.
-    gofer cmdfile  
+The format of the host connections on STDIN should be one or more lines like this:
+
+    ='<connection>' 'login'='<name>' 'password'='<password>' 'port'='<port>' 'hostname'='<hostname>'
+
+Although, note that only <connection> is required in all
+circumstances, and other name-value paramters can be added (they will
+be ignored).
+
+So if your .ssh/config defines connections to hosts with aliases
+C<foo> and C<bar>, you could do
+
+    echo -e "=foo\n=bar\n" | gofer id
+
+And it would run C<id> on both hosts.
+
+If you're sudoing, by default you need a "password alias":
+
+    echo -e "=foo 'password'='offsite'\n=bar 'password'='offsite'\n" | gofer 'sudo id'
+
+i.e. a name for the password that machine uses (not the password
+itself!).  Then gofer will prompt you to enter a password for each alias:
+
+    password for offsite: 
+    [ then output from each host here ]
+
+(Note, to be defined in more detail.)
+
 
 =head1 DESCRIPTION
 
@@ -25,42 +47,13 @@ It is WORK-IN-PROGRESS!  Expect rough edges.
 
 =head1 CONNECTIONS DEFINITIONS
 
-An example connections configuration file.
-
-    # It can contain comments and blank lines
-    host1   @host1
-
-    host2   user2@host2
-    host3   user3:password3@host3
-    host4   user4@host4:873
-    host5   user5:password5@host5:873
-
-=head1 CMDFILE
-
-An example command file:
-
-    # It can contain comments and blank lines
-
-    # normal commands are executed as the user logged in
-    ls 
-
-    # Multiple commands can be combined
-    cd / ; ls
-    grep /etc/hosts | cat >file
-
-    # If the line starts with "sudo" then the rest of the line
-    # is executed within a sudo shell
-    sudo cd /root/configuration; git status
-
-    # All commands are run under /bin/sh, which must be present for
-    # things to work
-
+To be written.
 
 =head1 EXAMPLE OUTPUT
 
 An example showing what you might get invoking:
 
-    cat hosts | gofer git-status.sh
+    cat hosts | gofer --file git-status.sh
 
 With C<git-status.sh> containing:
 
