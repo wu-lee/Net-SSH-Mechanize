@@ -36,9 +36,9 @@ has 'session' => (
     is => 'ro',
     lazy => 1,
     default => sub {
-        shift->login;
+        shift->_create_session;
     },
-    handles => [qw(capture capture_async sudo_capture sudo_capture_async logout)],
+    handles => [qw(login login_async capture capture_async sudo_capture sudo_capture_async logout)],
 );
 
 # The log-in timeout limit in seconds
@@ -91,7 +91,9 @@ around 'BUILDARGS' => sub {
 ######################################################################
 # public methods
 
-sub login_async {
+
+
+sub _create_session {
     my $self = shift;
 
     # We do this funny stuff with $session and $job so that the on_completion
@@ -142,20 +144,10 @@ sub login_async {
     # which just supplies extra methods we need.
 #    bless $session, 'Net::SSH::Mechanize::Session';
 
-    #printf "$Coro::current about to call login_async\n"; DB coro
-    my @arg = $session->login_async(@_);
-    # printf "$Coro::current exited login_async @arg\n"; # DB coro
-    return @arg;
+    return $session;
 }
 
-sub login {
-#    return (shift->login_async(@_)->recv)[1];
-    my ($cv) = shift->login_async(@_);
-#        printf "$Coro::current about to call recv\n"; # DB 
-    my $v = ($cv->recv)[1];
-#        printf "$Coro::current about to called recv\n"; # DB 
-    return $v;
-}
+
 
 __PACKAGE__->meta->make_immutable;
 1;

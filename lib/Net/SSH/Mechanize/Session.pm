@@ -32,6 +32,12 @@ has 'connection_params' => (
     # after AnyEvent::Subprocess::Job constructs the instance
 );
 
+has 'is_logged_in' => (
+    isa => 'Bool',
+    is => 'ro',
+    writer => '_set_logged_in',
+);
+
 has '_error_event' => (
     is => 'rw',
     isa => 'AnyEvent::CondVar',
@@ -133,6 +139,12 @@ sub login_async {
     my $stdin = $self->delegate('pty')->handle;
     my $stderr = $self->delegate('stderr')->handle;
 
+    # Make this a no-op if we've already logged in
+    if ($self->is_logged_in) {
+        $done->send($stdin, $self);
+        return $done;
+    }
+
     $self->_error_event->cb(sub {
 #        print "_error_event sent\n"; # DB
         $done->croak(shift->recv);
@@ -192,6 +204,7 @@ sub login_async {
                 # Cancel stderr monitor
                 $stderr->on_read(undef);
 
+                $self->_set_logged_in(1);
                 $done->send($stdin, $self); # done
                 return 'finished';
             }
@@ -207,9 +220,20 @@ sub login_async {
 }
 
     
+sub login {
+#    return (shift->login_async(@_)->recv)[1];
+    my ($cv) = shift->login_async(@_);
+#        printf "$Coro::current about to call recv\n"; # DB 
+    my $v = ($cv->recv)[1];
+#        printf "$Coro::current about to called recv\n"; # DB 
+    return $v;
+}
 
 sub logout {
     my $self = shift;
+    croak "cannot use session yet, as it is not logged in"
+        if !$self->is_logged_in;
+
     _push_write($self->delegate('pty')->handle => "exit\n");
     return $self;
 }
@@ -220,6 +244,9 @@ sub capture_async {
         \@_,
         { isa => 'Str' },
     );
+
+    croak "cannot use session yet, as it is not logged in"
+        if !$self->is_logged_in;
 
     my $stdin = $self->delegate('pty')->handle;
     my $stderr = $self->delegate('stderr')->handle;
@@ -279,6 +306,9 @@ sub sudo_capture_async {
         \@_,
         { isa => 'Str' },
     );
+
+    croak "cannot use session yet, as it is not logged in"
+        if !$self->is_logged_in;
 
     my $done = AnyEvent->condvar;
     $self->_error_event->cb(sub { 
