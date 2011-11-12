@@ -3,7 +3,8 @@ use strict;
 use warnings;
 use Test::More tests => 4;
 use FindBin qw($Bin);
-use lib "$Bin/../local-lib/lib/perl5", "$Bin/../lib", "$Bin/lib";
+use lib "$Bin/../lib";
+use lib "$Bin/lib";
 
 
 use Net::SSH::Mechanize;
