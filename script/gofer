@@ -9,66 +9,89 @@ gofer - execute multiple ssh sessions in parallel
     # This expects a list of host connection definitions on STDIN, 
     # then executes the command or command defined in the arguments 
     # on each:
-    cat connections | gofer <commands>
-
-The format of the host connections on STDIN should be one or more lines like this:
-
-    ='<connection>' 'login'='<name>' 'password'='<password>' 'port'='<port>' 'hostname'='<hostname>'
-
-Although, note that only <connection> is required in all
-circumstances, and other name-value paramters can be added (they will
-be ignored).
-
-So if your .ssh/config defines connections to hosts with aliases
-C<foo> and C<bar>, you could do
-
-    echo -e "=foo\n=bar\n" | gofer id
-
-And it would run C<id> on both hosts.
-
-If you're sudoing, by default you need a "password alias":
-
-    echo -e "=foo 'password'='offsite'\n=bar 'password'='offsite'\n" | gofer 'sudo id'
-
-i.e. a name for the password that machine uses (not the password
-itself!).  Then gofer will prompt you to enter a password for each alias:
-
-    password for offsite: 
-    [ then output from each host here ]
-
-(Note, to be defined in more detail.)
+    echo =host1 =host2 | gofer [options] <commands>
 
 
 =head1 DESCRIPTION
 
 This script will log in and execute commands on remote ssh servers.
 
-It is WORK-IN-PROGRESS!  Expect rough edges.
+It is WORK IN PROGRESS!  Expect rough edges.
 
-=head1 CONNECTIONS DEFINITIONS
+In simple terms, the format of the host connections on STDIN should be
+one or more terms like this:
 
-To be written.
+    ='<connection>' 'login'='<name>' 'password'='<password>' 'port'='<port>' 'hostname'='<hostname>'
+
+This is designed to be easy to parse using core Perl modules
+(specifically, 
+C<Text::ParseWords::parse_line(qr/\s*(=\s*|\s+)/, 0, $term)>).
+
+The first item must start with an equals character, and
+C< <connection> > indicates an (arbitrary) name for the connection.
+The other items can be omitted in certain circumstances. Only
+C<connection> is required in I<all> circumstances. Other
+name-value parameters can be added (they will be ignored).
+
+Multiple terms can be combined in one line, assuming the terms start
+with an equals character (i.e. no items contain unquoted spaces, such
+as C<'foo' ='bar'>).
+
+C<connection> is used as the default hostname passed to ssh if no
+explicit C<hostname> parameter is given.
+
+So if your .ssh/config defines connections to hosts with aliases
+C<foo> and C<bar>, you can use a concise form like this:
+
+    echo =foo =bar | gofer id
+
+Instead of requiring the longer equivalents:
+
+    echo -e "=foo\n=bar\n" | gofer id
+    echo -e "=foo 'hostname'='foo'\n=bar 'hostname'='bar'\n" | gofer id
+
+Both examples would run C<id> on both C<foo> and C<bar>.
+
+By default, you will be prompted for a password for each connection
+(whether or not you are sudoing or have ssh keys set up, etc.)  There
+are some ways to make this easier.
+
+First you can define keys and pass the C<--p=sudoing> option, which
+means you will only be prompted if the commands require a sudo.
+
+Second, you can pass a C<password> parameter:
+
+    echo -e "=foo 'password'='offsite'\n=bar 'password'='offsite'\n" | gofer 'sudo id'
+
+How this is interpreted can vary. By default the value is interpreted
+as a I<label> for the password (not the password itself!).  Then gofer
+will only prompt you to enter a password once for each label.
+
+The point of this is to avoid explicit passwords on the command line,
+whilst also avoiding having to type any more passwords than necessary.
+
+You can specify other interpretations for the C<password> parameter
+using the C<--password-broker> option.  These allow you to specify the
+password literally on the command line (not recommended in general),
+or in an obfuscated form (better).  The default is to prompt.
+
 
 =head1 EXAMPLE OUTPUT
 
 An example showing what you might get invoking:
 
-    cat hosts | gofer --file git-status.sh
+    echo =alpha password=xxx =beta password=xxx | gofer --file git-status.sh
 
-With C<git-status.sh> containing:
+With C<~/.ssh/config> defining key authenticated access for hosts with
+aliases C<alpha> and C<beta>, and C<git-status.sh> containing:
 
    # bla de bla
 
    sudo cd /root/configuration; git status
 
-And a C<hosts> containing:
-
-    alpha    @alpha
-    beta     @beta
-
 Then you might get output like the following:
  
-
+    password for xxx:
     ----[ alpha ]-----------------------------------------------------------
       # bla de bla
 
