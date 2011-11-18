@@ -262,38 +262,43 @@ sub parse_map {
     my @map;
     my $line_no = 0;
     foreach my $str (@$credentials) {
-        foreach (split '\n', $str) {
+        foreach my $line (split '\n', $str) {
             ++$line_no;
-            next if /^\s*#/;
-            next if /^\s*$/;
+            next if $line =~ /^\s*#/;
+            next if $line =~ /^\s*$/;
 
-            my ($name, $attrs) = eval {
-                deserialize $_;
-            }
-            or do {
-                # Note: deserialize should be written to not divulge anything
-                # specific, just a type of error.
-                die "error parsing credentials, on line #$line_no: $@\n";
-            };
+            # Split lines into sub-expressions, assuming that each
+            # starts with a '=' preceded by white-space.
+            foreach (split /\s+(?==)/, $line) {
 
-            my $authentication = $attrs->{authentication} || '';
-            if ($passwords_required || $authentication eq 'password') {
-                # Obtain the real password from our broker, if one exists.
-                # This allows us to perform whatever sort of prompting,
-                # look-up, or decryption we need, in a customisable way.
+                my ($name, $attrs) = eval {
+                    deserialize $_;
+                }
+                    or do {
+                        # Note: deserialize should be written to not divulge anything
+                        # specific, just a type of error.
+                        die "error parsing credentials, on line #$line_no: $@\n";
+                    };
 
-                my $identifier = $attrs->{password} || $name;
-                $attrs->{password} = $password_broker->($identifier);
-            }
-            else {
-                # Remove password, to avoid distributing it unnecessarily
-                delete $attrs->{password};
-            }
+                my $authentication = $attrs->{authentication} || '';
+                if ($passwords_required || $authentication eq 'password') {
+                    # Obtain the real password from our broker, if one exists.
+                    # This allows us to perform whatever sort of prompting,
+                    # look-up, or decryption we need, in a customisable way.
+                    my $identifier = $attrs->{password} || $name;
+                    $attrs->{password} = $password_broker->($identifier);
+                }
+                else {
+                    # Remove password, to avoid distributing it unnecessarily
+                    delete $attrs->{password};
+                }
 
-            # A convenience.
-            $attrs->{host} ||= $name;
+                # A convenience: by default, assume the hostname is
+                # the name.
+                $attrs->{host} ||= $name;
             
-            push @map, $name, $attrs;
+                push @map, $name, $attrs;
+            }
         }
     }
     
