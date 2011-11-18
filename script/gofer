@@ -108,7 +108,18 @@ use lib "$Bin/../local-lib/lib/perl5", "$Bin/../local-lib/lib/perl5/i486-linux-g
 
 use Carp qw(croak);
 
+# Define the password policies, and the default
+my $default_password_policy = 'always';
+my %password_policies = (
+    always => sub { 1 }, # always get a password
+    sudoing => sub { shift }, # only get a password if we are sudoing
+    never => sub { 0 }, # never get a password
+);
+
+
 ######################################################################
+
+
 
 sub slurp {
     my ($file) = @_;
@@ -257,7 +268,7 @@ sub parse_map {
     my %params = @_;
     my $password_broker = $params{password_broker};
     my $credentials = $params{credentials};
-    my $passwords_required = $params{passwords_required};
+    my $will_sudo = $params{will_sudo};
 
     my @map;
     my $line_no = 0;
@@ -280,8 +291,16 @@ sub parse_map {
                         die "error parsing credentials, on line #$line_no: $@\n";
                     };
 
-                my $authentication = $attrs->{authentication} || '';
-                if ($passwords_required || $authentication eq 'password') {
+                # Decide whether we need to get a password, and if so, get one
+                my $password_policy = $attrs->{get_password} || $default_password_policy;
+                my $decider = $password_policies{$password_policy};
+                if (!$decider) {
+                    warn "unknown password policy '$password_policy', ignoring\n",
+                        "(known policies are: @{[keys %password_policies]})\n";
+                    $decider = $password_policies{$default_password_policy};
+                }
+                 
+                if ($decider->($will_sudo)) {
                     # Obtain the real password from our broker, if one exists.
                     # This allows us to perform whatever sort of prompting,
                     # look-up, or decryption we need, in a customisable way.
@@ -379,12 +398,18 @@ GetOptions(
 
         $commands = slurp $command_file;
     },
-    "--password|p=s" => sub {
+    "--password-broker|b=s" => sub {
         (undef, $password_broker) = @_;
         die "No such password broker '$password_broker'\n"
             unless $password_brokers{$password_broker};
     },
-    "--credential|cs=s" => sub {
+    "--password-policy|p=s" => sub {
+        (undef, $default_password_policy) = @_;        
+        die "Unknown password policy '$default_password_policy'\n",
+            "(known policies are: @{[keys %password_policies]})\n"
+            unless $password_policies{$default_password_policy};
+    },
+    "--credentials-file|c=s" => sub {
         my (undef, $credentials_file) = @_;
         die "no such file '$credentials_file'\n"
             unless -f $credentials_file;
@@ -428,7 +453,7 @@ my ($script, $sudos) = compile_script $commands;
 # Parse the credentials, get passwords if required
 my %map = parse_map(
     password_broker => $password_broker,
-    passwords_required => $sudos,
+    will_sudo => $sudos,
     credentials => \@credentials,
 );
 
