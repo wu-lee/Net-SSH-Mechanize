@@ -408,12 +408,12 @@ Net::SSH::Expect>, L<Net::SSH::Perl>, L<POE::Component::OpenSSH>, L<App::MrShell
 
 =head1 AUTHOR
 
-Nick Stokoe  C<< <npw@cpan.org> >>
+Nick Stokoe  C<< <wulee@cpan.org> >>
 
 
 =head1 LICENCE AND COPYRIGHT
 
-Copyright (c) 2011, Nick Stokoe C<< <npw@cpan.org> >>. All rights reserved.
+Copyright (c) 2011, Nick Stokoe C<< <wulee@cpan.org> >>. All rights reserved.
 
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.

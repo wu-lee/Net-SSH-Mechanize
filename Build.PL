@@ -21,7 +21,7 @@ use Module::Build;
 my $builder = Module::Build->new
     (module_name         => 'Net::SSH::Mechanize',
      license             => 'artistic',
-     dist_author         => 'Nick Stokoe <npw@cpan.org>',
+     dist_author         => 'Nick Stokoe <wulee@cpan.org>',
      dist_version_from   => 'lib/Net/SSH/Mechanize.pm',
      dist_abstract       => 'Asynchronous ssh command invocation',
      create_readme       => 1,

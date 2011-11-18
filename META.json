@@ -1,7 +1,7 @@
 {
    "abstract" : "Asynchronous ssh command invocation",
    "author" : [
-      "Nick Stokoe <npw@cpan.org>"
+      "Nick Stokoe <wulee@cpan.org>"
    ],
    "dynamic_config" : 1,
    "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.112580",
