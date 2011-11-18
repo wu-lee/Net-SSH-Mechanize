@@ -13,8 +13,12 @@ my $initial_prompt_re = qr/^.*?\Q$ \E$/m;
 my $sudo_initial_prompt_re = qr/^.*?\Q$ \E$/m;
 
 # Create a random text delimiter
-my $delim = pack "A*", map int(rand 64), 1..20;
-$delim =~ tr/\x00-\x3f/A-Za-z0-9_-/;
+# We want chars A-Z, a-z, 0-9, _- => 26+26+10 = 64 different characters.
+# First we generate a random string of ASCII chars 1..65,
+my $delim = pack "W*", map { int(rand 64)+1 } 1..20;
+
+# Then we map it to the characters we want.
+$delim =~ tr/\x01-\x40/A-Za-z0-9_-/;
 
 my $prompt = "$delim";
 
