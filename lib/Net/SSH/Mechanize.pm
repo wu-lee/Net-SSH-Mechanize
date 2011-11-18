@@ -12,11 +12,10 @@ our @CARP_NOT = qw(AnyEvent AnyEvent::Subprocess Coro::AnyEvent);
 
 use version; our $VERSION = qv('0.1');
 
-{
-    # Stop our carp errors from being reported within AnyEvent::Coro
-    package Coro::AnyEvent;
-    our @CARP_NOT = qw(AnyEvent::CondVar);
-}
+
+# Stop our carp errors from being reported within AnyEvent::Coro
+@Coro::AnyEvent::CARP_NOT = qw(AnyEvent::CondVar);
+
 
 #$AnyEvent::Log::FILTER->level("fatal");
 

@@ -48,10 +48,6 @@
       }
    },
    "provides" : {
-      "Coro::AnyEvent" : {
-         "file" : "lib/Net/SSH/Mechanize.pm",
-         "version" : 0
-      },
       "Net::SSH::Mechanize" : {
          "file" : "lib/Net/SSH/Mechanize.pm",
          "version" : "v0.1.0"
