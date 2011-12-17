@@ -1,7 +1,7 @@
 {
    "abstract" : "Asynchronous ssh command invocation",
    "author" : [
-      "Nick Stokoe <npw@cpan.org>"
+      "Nick Stokoe <wulee@cpan.org>"
    ],
    "dynamic_config" : 0,
    "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.112580",
@@ -48,13 +48,9 @@
       }
    },
    "provides" : {
-      "Coro::AnyEvent" : {
-         "file" : "lib/Net/SSH/Mechanize.pm",
-         "version" : 0
-      },
       "Net::SSH::Mechanize" : {
          "file" : "lib/Net/SSH/Mechanize.pm",
-         "version" : "v0.1.0"
+         "version" : "v0.1.1"
       },
       "Net::SSH::Mechanize::ConnectParams" : {
          "file" : "lib/Net/SSH/Mechanize/ConnectParams.pm",
@@ -78,5 +74,5 @@
          "url" : "https://github.com/wu-lee/Net-SSH-Mechanize"
       }
    },
-   "version" : "v0.1.0"
+   "version" : "v0.1.1"
 }

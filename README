@@ -2,7 +2,7 @@ NAME
     Net::SSH::Mechanize - asynchronous ssh command invocation
 
 VERSION
-    This document describes "Net::SSH::Mechanize" version 0.1
+    This document describes "Net::SSH::Mechanize" version 0.1.1
 
 SYNOPSIS
     Somewhat like "POE::Component::OpenSSH", "SSH::Batch",
@@ -210,10 +210,10 @@ SEE ALSO
     Net::SSH::Expect, Net::SSH::Perl, POE::Component::OpenSSH, App::MrShell.
 
 AUTHOR
-    Nick Stokoe "<npw@cpan.org>"
+    Nick Stokoe "<wulee@cpan.org>"
 
 LICENCE AND COPYRIGHT
-    Copyright (c) 2011, Nick Stokoe "<npw@cpan.org>". All rights reserved.
+    Copyright (c) 2011, Nick Stokoe "<wulee@cpan.org>". All rights reserved.
 
     This module is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself. See perlartistic.

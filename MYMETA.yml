@@ -1,7 +1,7 @@
 ---
 abstract: 'Asynchronous ssh command invocation'
 author:
-  - 'Nick Stokoe <npw@cpan.org>'
+  - 'Nick Stokoe <wulee@cpan.org>'
 build_requires:
   Module::Build: 0.28
 configure_requires:
@@ -19,12 +19,9 @@ meta-spec:
   version: 1.4
 name: Net-SSH-Mechanize
 provides:
-  Coro::AnyEvent:
-    file: lib/Net/SSH/Mechanize.pm
-    version: 0
   Net::SSH::Mechanize:
     file: lib/Net/SSH/Mechanize.pm
-    version: v0.1.0
+    version: v0.1.1
   Net::SSH::Mechanize::ConnectParams:
     file: lib/Net/SSH/Mechanize/ConnectParams.pm
     version: 0
@@ -49,4 +46,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/artistic-license.php
   repository: https://github.com/wu-lee/Net-SSH-Mechanize
-version: v0.1.0
+version: v0.1.1
