@@ -10,7 +10,7 @@ use AnyEvent::Subprocess;
 use Carp qw(croak);
 our @CARP_NOT = qw(AnyEvent AnyEvent::Subprocess Coro::AnyEvent);
 
-use version; our $VERSION = qv('0.1');
+use version; our $VERSION = qv('0.1.1');
 
 
 # Stop our carp errors from being reported within AnyEvent::Coro
@@ -162,7 +162,7 @@ Net::SSH::Mechanize - asynchronous ssh command invocation
 
 =head1 VERSION
 
-This document describes C<Net::SSH::Mechanize> version 0.1
+This document describes C<Net::SSH::Mechanize> version 0.1.1
 
 
 =head1 SYNOPSIS
