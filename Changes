@@ -1,6 +1,11 @@
 Revision history for Net-SSH-Mechanize
 0.0.1  2011-09-27       Initial release.
 
+v0.1.1 - Mon Dec 19 13:24:20 2011
+	Changed maintainership, corrected CPAN email
+	Minor fixes for CPAN metadata friendliness (setting 
+	@Coro::AnyEvent::CARP_NOT without actually opening the package).
+
 1.00 - Fri Nov 18 16:39:51 2011
 	First CPAN release
 	Nominally working
