@@ -2,7 +2,7 @@ NAME
     Net::SSH::Mechanize - asynchronous ssh command invocation
 
 VERSION
-    This document describes "Net::SSH::Mechanize" version 0.1.1
+    This document describes "Net::SSH::Mechanize" version 0.1.2
 
 SYNOPSIS
     Somewhat like "POE::Component::OpenSSH", "SSH::Batch",

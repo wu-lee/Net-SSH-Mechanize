@@ -50,7 +50,7 @@
    "provides" : {
       "Net::SSH::Mechanize" : {
          "file" : "lib/Net/SSH/Mechanize.pm",
-         "version" : "v0.1.1"
+         "version" : "v0.1.2"
       },
       "Net::SSH::Mechanize::ConnectParams" : {
          "file" : "lib/Net/SSH/Mechanize/ConnectParams.pm",
@@ -74,5 +74,5 @@
          "url" : "https://github.com/wu-lee/Net-SSH-Mechanize"
       }
    },
-   "version" : "v0.1.1"
+   "version" : "v0.1.2"
 }
