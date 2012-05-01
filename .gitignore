@@ -15,3 +15,4 @@ Net-SSH-Mechanize-*
 tmp*
 local-lib
 script/.gofer.conf
+/MYMETA.*

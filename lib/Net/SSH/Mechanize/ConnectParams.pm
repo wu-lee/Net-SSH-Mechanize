@@ -1,6 +1,8 @@
 package Net::SSH::Mechanize::ConnectParams;
 use Moose;
 
+# VERSION
+
 has 'host' => (
     isa => 'Str',
     is => 'rw',
