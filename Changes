@@ -1,4 +1,13 @@
 Revision history for Net-SSH-Mechanize
+{{$NEXT}}
+	In Net::SSH::Mechanize::Session - Use 'C*' pack format instead
+	of 'W*' as it is more portable
+
+	Convert distro to use Dist::Zilla instead of Module::Release
+	(since the latter can't handle three-part versions yet)
+
+	Correct ordering/numbering in this Changes file
+
 v0.1.1 - Mon Dec 19 13:24:20 2011
 	Changed maintainership, corrected CPAN email
 	Minor fixes for CPAN metadata friendliness (setting 
