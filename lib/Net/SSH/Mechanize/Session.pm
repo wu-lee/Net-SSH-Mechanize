@@ -5,6 +5,8 @@ use AnyEvent;
 use Carp qw(croak);
 our @CARP_NOT = qw(Net::SSH::Mechanize AnyEvent);
 
+# VERSION
+
 extends 'AnyEvent::Subprocess::Running';
 
 my $passwd_prompt_re = qr/assword:\s*/;

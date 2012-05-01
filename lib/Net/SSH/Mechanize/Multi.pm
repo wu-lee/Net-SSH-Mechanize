@@ -4,6 +4,8 @@ use Net::SSH::Mechanize;
 use Carp qw(croak);
 use Coro;
 
+# VERSION
+
 ######################################################################
 # attributes
 
