@@ -389,6 +389,18 @@ instantiated or will not have any effect on anything thereafter.
 These methods exist here for convenience; they delegate to the
 equivalent C<Net::SSH::Mechanize::Session> methods.
 
+
+=head1 KNOWN ISSUES
+
+=over 4
+
+=item "unexpected stderr from command: stderr output" in test output
+
+Something I haven't yet figured out how to banish properly. However,
+it does appear to be harmless. Patches welcome.
+
+=back
+
 =head1 SEE ALSO
 
 There are a lot of related tools, and this is just in Perl.  Probably
