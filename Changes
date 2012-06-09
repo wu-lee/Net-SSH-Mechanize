@@ -1,5 +1,7 @@
 Revision history for Net-SSH-Mechanize
 {{$NEXT}}
+
+0.1.2     2012-05-01 15:58:10 Europe/London
 	In Net::SSH::Mechanize::Session - Use 'C*' pack format instead
 	of 'W*' as it is more portable
 
