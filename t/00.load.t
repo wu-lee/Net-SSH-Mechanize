@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use File::Find;
+use Config;
 use FindBin qw($Bin);
 
 use Test::More 'no_plan';
@@ -10,6 +11,13 @@ use Test::More 'no_plan';
 # modules load ok.
 
 my $script_dir = "$Bin/../script";
+
+# From perlvar
+my $secure_perl_path = $Config{perlpath};
+if ($^O ne 'VMS') {
+    $secure_perl_path .= $Config{_exe}
+        unless $secure_perl_path =~ m/$Config{_exe}$/i;
+}
 
 # We need to use blib/lib and not lib, since some modules may depend
 # on the Module::Build::ConfigData module generated there by
@@ -32,7 +40,7 @@ sub has_shebang
 sub compile_script
 {
     my $file = shift;
-    my @errors = grep !/syntax OK/, `perl -cw -I '$lib_dir' '$file' 2>&1 >/dev/null`;
+    my @errors = grep !/syntax OK/, `$secure_perl_path -cw -I '$lib_dir' '$file' 2>&1 >/dev/null`;
 
     my $errors = join "", @errors;
     $errors .= "Return code ". ($? & 0xff) 
