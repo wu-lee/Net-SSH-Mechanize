@@ -1,5 +1,12 @@
 Revision history for Net-SSH-Mechanize
 {{$NEXT}}
+	Add a "Known Issues" section to the POD.
+
+	Stop using Getopt::Long::GetOptionsFromArray (to support older
+	perls).
+
+	Reinvoke Perl scripts with the same executable (to avoid
+	mismatched versions, missing binaries - RT #77013).
 
 0.1.2     2012-05-01 15:58:10 Europe/London
 	In Net::SSH::Mechanize::Session - Use 'C*' pack format instead
