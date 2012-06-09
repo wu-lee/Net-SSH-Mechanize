@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Text::ParseWords qw(parse_line);
-use Getopt::Long qw(GetOptionsFromArray :config posix_default);
+use Getopt::Long qw(:config posix_default);
 
 # Note: this script can't deal with ; delimiters which are run into other arguments
 
@@ -16,12 +16,19 @@ sub hack_off_quotes {
 my $unauthenticated = 1;
 sub sudo {
     my ($params, %env) = @_;
+
+    # Locally alias @ARGV to $params rather than use
+    # GetOptionsFromArray, for the sake of portability (Some currently
+    # widely used versions of Perl don't have a version of
+    # Getopt::Long with it).
+    local *ARGV = $params;
+
     shift @$params;
     
     my $pw_prompt = '[sudo] password for user: ';
     my $unauthenticate = 0;
-    GetOptionsFromArray(
-        $params,
+
+    GetOptions(
         "K" => \$unauthenticate,
         "p=s" => \$pw_prompt,
     )
