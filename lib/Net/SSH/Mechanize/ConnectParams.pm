@@ -26,6 +26,16 @@ has 'port' => (
     default => 22,
 );
 
+has 'options' => (
+    isa => 'HashRef[Str]',
+    is => 'rw',
+    default => sub { {} },
+    handles => {
+        ssh_options => 'keys',
+        get_option => 'get',
+    },
+);
+
 sub ssh_cmd {
     my $self = shift;
 
@@ -33,6 +43,9 @@ sub ssh_cmd {
 
     unshift @cmd, defined $self->user? ('-l', $self->user) : ();
     unshift @cmd, defined $self->port? ('-p', $self->port) : ();
+    foreach my $sshOption ($self->ssh_options()) {
+        unshift @cmd, '-o ' . $sshOption . '=' . $self->get_option($sshOption);
+    }
     unshift @cmd, '/usr/bin/ssh';
     return @cmd;
 }
