@@ -37,6 +37,16 @@ has 'options' => (
     },
 );
 
+has 'flags' => {
+    traits => ['Array'],
+    isa => 'ArrayRef[Str]',
+    is => 'rw',
+    default => sub { [] },
+    handles => {
+        get_flags => 'elements',
+    },
+};
+
 sub ssh_cmd {
     my $self = shift;
 
@@ -44,6 +54,9 @@ sub ssh_cmd {
 
     unshift @cmd, defined $self->user? ('-l', $self->user) : ();
     unshift @cmd, defined $self->port? ('-p', $self->port) : ();
+    foreach my $sshFlag ($self->get_flags()) {
+        unshift @cmd, '-' . $sshFlag;
+    }
     foreach my $sshOption ($self->ssh_options()) {
         unshift @cmd, '-o ' . $sshOption . '=' . $self->get_option($sshOption);
     }
