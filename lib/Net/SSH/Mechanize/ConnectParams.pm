@@ -94,6 +94,27 @@ This equates to C</usr/bin/ssh -l someone -p 999 -t somewhere.com sh>:
         password => 'secret',
     );
 
+This ssh syntax connects as above, but without public key checks:
+
+C</usr/bin/ssh -o StrictHostKeyChecking=no -o>
+  C<  UserKnownHostsFile=/dev/null -o PubkeyAuthentication=yes>
+  C<  -q -x -a -p 999 -l someone -t somewhere.com sh>
+
+Respresented below as:
+
+    my $all_params = Net::SSH::Mechanize::ConnectParams->new(
+        host => 'somewhere.com',
+        user => 'someone',
+        port => 999,
+        password => 'secret',
+        options => {
+            "UserKnownHostsFile"    => "/dev/null",
+            "PubkeyAuthentication"  => "yes",
+            "StrictHostKeyChecking" => "no"
+        },
+        flags => [ "a", "x", "q" ],
+    );
+
 =head1 CLASS METHODS
 
 =head2 C<< $obj = $class->new(%parameters) >>
@@ -123,6 +144,14 @@ to 22 if this is not specificed).
 
 The password to connect with (a scalar string).  This is only required
 if authentication will be performed, either on log-in or when sudoing.
+
+=item C<options>
+
+A hashref of options to be preceded by the -o flag in the ssh syntax.
+
+=item C<flags>
+
+An arrayref of ssh flags, e.g. C<[-1246AaCfgKkMNnqsTtVvXxYy]>
 
 =back
 
