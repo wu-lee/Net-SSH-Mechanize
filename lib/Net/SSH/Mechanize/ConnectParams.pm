@@ -27,6 +27,7 @@ has 'port' => (
 );
 
 has 'options' => (
+    traits => ['Hash'],
     isa => 'HashRef[Str]',
     is => 'rw',
     default => sub { {} },
