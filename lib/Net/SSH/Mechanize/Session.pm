@@ -28,7 +28,7 @@ my $sudo_passwd_prompt = "$delim-passwd";
 
 my $prompt_re = qr/\Q$prompt\E$/sm;
 
-my $sudo_passwd_prompt_re = qr/^$sudo_passwd_prompt$/;
+my $sudo_passwd_prompt_re = qr/^$sudo_passwd_prompt$/m;
 
 
 has 'connection_params' => (
